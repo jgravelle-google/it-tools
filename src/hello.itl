@@ -1,0 +1,3 @@
+(import "foo"
+    (func "bar" (param s32 string) (result u32))
+)
