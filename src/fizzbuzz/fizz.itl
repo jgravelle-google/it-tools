@@ -1,0 +1,9 @@
+(wasm
+    (func "isFizz" (param i32) (result i32))
+)
+
+(export
+    (func "isFizz" (param s32) (result u1)
+        (as u1 (call-export "isFizz" (as i32 (local 0))))
+    )
+)
