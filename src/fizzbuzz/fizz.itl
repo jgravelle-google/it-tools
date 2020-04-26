@@ -2,4 +2,11 @@
     (func "isFizz" (param s32) (result u1)
         (as u1 (call-export "isFizz" (as i32 (local 0))))
     )
+    (func "fizzStr" (param) (result string)
+        (let (call-export "fizzStr"))
+        (mem-to-string
+            (local 0)
+            (call-export "_it_strlen" (local 0))
+        )
+    )
 )
