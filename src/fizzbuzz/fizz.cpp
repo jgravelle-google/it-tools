@@ -1,7 +1,4 @@
-// #include "fizz.h"
-// TODO: generate headers
-__attribute__((export_name("isFizz")))
-bool isFizz(int);
+#include "fizz_impl.h"
 
 bool isFizz(int n) {
     return n % 3 == 0;

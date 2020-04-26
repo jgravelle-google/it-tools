@@ -7,15 +7,14 @@ import sys
 class AST(object):
     def __init__(self):
       self.imports = []
-      self.wasm_exports = []
       self.exports = []
 
 class Func(object):
-    def __init__(self, name, params, results, body=None):
+    def __init__(self, name, params, results, body):
         self.name = name
         self.params = params
         self.results = results
-        self.body = body or []
+        self.body = body
 
 class SexprParser(object):
     def __init__(self, body):
@@ -59,6 +58,8 @@ def parse(body):
     def parse_func(sexpr):
         assert(sexpr[0] == 'func')
         name = sexpr[1]
+        assert(name[0] == '"' and name[-1] == '"')
+        name = name[1:-1]
         assert(sexpr[2][0] == 'param')
         params = sexpr[2][1:]
         assert(sexpr[3][0] == 'result')
@@ -67,13 +68,9 @@ def parse(body):
         return Func(name, params, results, body)
 
     for group in sexprs:
-        if group[0] == 'wasm':
-            for elem in group[1:]:
-                func = parse_func(elem)
-                ast.wasm_exports.append(func)
-        elif group[0] == 'export':
+        if group[0] == 'export':
             for elem in group[1:]:
                 func = parse_func(elem)
                 ast.exports.append(func)
 
-    return ast.__dict__
+    return ast
