@@ -46,6 +46,10 @@ class SexprParser(object):
                 self.end_atom()
                 top = self.pop()
                 self.top().append(top)
+            elif c == ';' and self.body[i+1] == ';':
+                # line comments are ';;'
+                while self.body[i] != '\n':
+                    i += 1
             else:
                 self.cur += c
             i += 1

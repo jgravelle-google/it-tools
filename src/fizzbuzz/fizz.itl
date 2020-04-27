@@ -4,7 +4,7 @@
     )
     (func "fizzStr" (param) (result string)
         (let (call-export "fizzStr"))
-        (mem-to-string
+        (mem-to-string "memory"
             (local 0)
             (call-export "_it_strlen" (local 0))
         )
