@@ -1,9 +1,9 @@
-#include "buzz.h"
+#include "buzz_impl.h"
 
 bool isBuzz(int n) {
     return n % 5 == 0;
 }
 
-char* buzzStr() {
+const char* buzzStr() {
     return "Buzz";
 }

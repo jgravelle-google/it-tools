@@ -1,0 +1,12 @@
+(export
+    (func "isBuzz" (param s32) (result u1)
+        (as u1 (call-export "isBuzz" (as i32 (local 0))))
+    )
+    (func "buzzStr" (param) (result string)
+        (let (call-export "buzzStr"))
+        (mem-to-string "memory"
+            (local 0)
+            (call-export "_it_strlen" (local 0))
+        )
+    )
+)

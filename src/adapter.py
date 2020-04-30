@@ -71,7 +71,7 @@ def write_js_module():
             local = 'x' + str(num_locals)
             num_locals += 1
             ex = expr(sexpr[1])
-            return 'let {} = {};'.format(local, ex)
+            return 'let {} = {}'.format(local, ex)
         elif head == 'mem-to-string':
             assert(len(sexpr) == 4)
             mem = sexpr[1]
