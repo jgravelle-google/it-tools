@@ -4,7 +4,7 @@ async function run() {
     let buzz = await require('../out/buzz.js').instantiate({});
     let fizzbuzz = await require('../out/fizzbuzz.js').instantiate({
         fizz, buzz,
-        printer: { print: console.log },
+        console,
     });
 
     // Run it

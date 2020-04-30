@@ -6,9 +6,11 @@
     (func "isBuzz" (param s32) (result u1))
     (func "buzzStr" (param) (result string))
 )
-(import "printer"
+(import "console"
+    (func "log" (param string) (result))
+    ;; XXX: function names here are a hack for C++ codegen
     (func "print" (param string) (result))
-    (func "printInt" (param s32) (result)) ;; ok this is a hack
+    (func "printInt" (param s32) (result))
 )
 
 (module wasm "out/fizzbuzz.wasm"
@@ -52,16 +54,16 @@
             (local 1)
         )
     )
-    (import "printer"
+    (import "console"
         (func "print" (param i32) (result)
-            (call-import "printer" "print"
+            (call-import "console" "log"
                 (mem-to-string wasm "memory"
                     (local 0)
                     (call-export wasm "_it_strlen" (local 0))
                 ))
         )
         (func "printInt" (param i32) (result)
-            (call-import "printer" "print"
+            (call-import "console" "log"
                 (as string (local 0)))
         )
     )
