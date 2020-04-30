@@ -63,9 +63,11 @@ def write_js_module():
             assert(len(sexpr) == 2)
             return 'x' + sexpr[1]
         elif head == 'call-export':
-            fn = sexpr[1]
-            args = ', '.join([expr(x) for x in sexpr[2:]])
-            return 'exported[{}]({})'.format(fn, args)
+            assert(len(sexpr) >= 3)
+            mod_name = sexpr[1]
+            fn = sexpr[2]
+            args = ', '.join([expr(x) for x in sexpr[3:]])
+            return '{}[{}]({})'.format(mod_name, fn, args)
         elif head == 'let':
             assert(len(sexpr) == 2)
             local = 'x' + str(num_locals)
@@ -73,23 +75,36 @@ def write_js_module():
             ex = expr(sexpr[1])
             return 'let {} = {}'.format(local, ex)
         elif head == 'mem-to-string':
-            assert(len(sexpr) == 4)
-            mem = sexpr[1]
-            ptr = expr(sexpr[2])
-            length = expr(sexpr[3])
-            return 'memToString({}, {}, {})'.format(mem, ptr, length)
+            assert(len(sexpr) == 5)
+            mod = sexpr[1]
+            mem = sexpr[2]
+            ptr = expr(sexpr[3])
+            length = expr(sexpr[4])
+            return 'memToString({}[{}], {}, {})'.format(mod, mem, ptr, length)
         else:
             assert(False)
+
+    # Paths and setup
     js_path = os.path.join(outpath, basename + '.js')
-    wasm_path = os.path.join(outpath, basename + '.wasm')
     template_path = os.path.join('src', 'wrapper_module_template.js')
-    js = open(template_path).read()
-    js = js.replace('/**WASM_PATH**/', escape(wasm_path))
-    imports = ''
-    # TODO: imports
-    js = js.replace('/**IMPORTS**/\n', imports)
-    exports = ''
+    js_str = open(template_path).read()
     tab = '    '
+
+    # TODO: imports
+    # imports = ''
+    # js_str = js_str.replace('/**IMPORTS**/\n', imports)
+
+    module_names = ''
+    load_modules = ''        
+    for mod in ast.modules:
+        name = mod.name
+        path = mod.path
+        module_names += tab * 2 + 'let {};'.format(name)
+        load_modules += tab * 2 + '{} = await loadModule({}, {{}})'.format(name, path)
+    js_str = js_str.replace('/**MODULE_NAMES**/', module_names)
+    js_str = js_str.replace('/**LOAD_MODULES**/', load_modules)
+
+    exports = ''
     for func in ast.exports:
         params = ', '.join(['x' + str(i) for i in range(len(func.params))])
         exports += tab * 3 + '{}: function({}) {{\n'.format(func.name, params)
@@ -104,8 +119,8 @@ def write_js_module():
             exports += ';\n'
 
         exports += tab * 3 + '},\n'
-    js = js.replace('/**EXPORTS**/\n', exports)
-    open(js_path, 'w').write(js)
+    js_str = js_str.replace('/**EXPORTS**/\n', exports)
+    open(js_path, 'w').write(js_str)
     print('Wrote JS module', js_path)
 
 write_header()

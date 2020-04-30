@@ -4,10 +4,11 @@
 
 import sys
 
-class AST(object):
+class Component(object):
     def __init__(self):
       self.imports = []
       self.exports = []
+      self.modules = []
 
 class Func(object):
     def __init__(self, name, params, results, body):
@@ -15,6 +16,12 @@ class Func(object):
         self.params = params
         self.results = results
         self.body = body
+
+class Module(object):
+    def __init__(self, name, path, funcs):
+        self.name = name
+        self.path = path
+        self.funcs = funcs
 
 class SexprParser(object):
     def __init__(self, body):
@@ -57,7 +64,7 @@ class SexprParser(object):
 
 def parse(body):
     sexprs = SexprParser(body).parse()
-    ast = AST()
+    component = Component()
 
     def parse_func(sexpr):
         assert(sexpr[0] == 'func')
@@ -72,9 +79,14 @@ def parse(body):
         return Func(name, params, results, body)
 
     for group in sexprs:
-        if group[0] == 'export':
+        if group[0] == 'module':
+            name = group[1]
+            path = group[2]
+            funcs = [parse_func(e) for e in group[3:]]
+            component.modules.append(Module(name, path, funcs))
+        elif group[0] == 'export':
             for elem in group[1:]:
                 func = parse_func(elem)
-                ast.exports.append(func)
+                component.exports.append(func)
 
-    return ast
+    return component

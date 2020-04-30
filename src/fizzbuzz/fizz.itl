@@ -1,12 +1,18 @@
+(module wasm "out/fizz.wasm"
+    (func "isFizz" (param i32) (result))
+    (func "fizzStr" (param) (result i32))
+    (func "_it_strlen" (param i32) (result i32))
+)
+
 (export
     (func "isFizz" (param s32) (result u1)
-        (as u1 (call-export "isFizz" (as i32 (local 0))))
+        (as u1 (call-export wasm "isFizz" (as i32 (local 0))))
     )
     (func "fizzStr" (param) (result string)
-        (let (call-export "fizzStr"))
-        (mem-to-string "memory"
+        (let (call-export wasm "fizzStr"))
+        (mem-to-string wasm "memory"
             (local 0)
-            (call-export "_it_strlen" (local 0))
+            (call-export wasm "_it_strlen" (local 0))
         )
     )
 )
