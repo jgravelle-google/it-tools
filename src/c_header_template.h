@@ -13,3 +13,9 @@ int _it_strlen(const char* str) {
     while (*str++) len++;
     return len;
 }
+
+__attribute__((export_name("_it_writeStringTerm")))
+void _it_writeStringTerm(char* str, int len) {
+    // Writes null-terminator for imported strings
+    str[len] = 0;
+}

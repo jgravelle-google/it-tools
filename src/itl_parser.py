@@ -6,7 +6,7 @@ import sys
 
 class Component(object):
     def __init__(self):
-      self.imports = []
+      self.imports = {}
       self.exports = []
       self.modules = []
 
@@ -18,10 +18,11 @@ class Func(object):
         self.body = body
 
 class Module(object):
-    def __init__(self, name, path, funcs):
+    def __init__(self, name, path):
         self.name = name
         self.path = path
-        self.funcs = funcs
+        self.funcs = []
+        self.imports = {}
 
 class SexprParser(object):
     def __init__(self, body):
@@ -77,16 +78,29 @@ def parse(body):
         results = sexpr[3][1:]
         body = sexpr[4:]
         return Func(name, params, results, body)
+    def parse_module_elem(mod, sexpr):
+        if sexpr[0] == 'func':
+            mod.funcs.append(parse_func(sexpr))
+        elif sexpr[0] == 'import':
+            im_name = sexpr[1]
+            funcs = [parse_func(e) for e in sexpr[2:]]
+            mod.imports[im_name] = funcs
 
     for group in sexprs:
         if group[0] == 'module':
             name = group[1]
             path = group[2]
-            funcs = [parse_func(e) for e in group[3:]]
-            component.modules.append(Module(name, path, funcs))
+            mod = Module(name, path)
+            for elem in group[3:]:
+                parse_module_elem(mod, elem)
+            component.modules.append(mod)
         elif group[0] == 'export':
             for elem in group[1:]:
                 func = parse_func(elem)
                 component.exports.append(func)
+        elif group[0] == 'import':
+            name = group[1]
+            funcs = [parse_func(e) for e in group[2:]]
+            component.imports[name] = funcs
 
     return component

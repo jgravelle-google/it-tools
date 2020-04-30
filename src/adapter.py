@@ -17,7 +17,7 @@ itl_path = sys.argv[1]
 itl_filename = os.path.basename(itl_path)
 basename, _ = os.path.splitext(itl_filename)
 contents = open(itl_path).read()
-ast = itl_parser.parse(contents)
+component = itl_parser.parse(contents)
 
 outpath = 'out'
 ensure_path(outpath)
@@ -29,26 +29,43 @@ def it_to_cpp_ty(ty):
         'string': 'const char*',
     }
     return TYPES[ty]
+def it_to_cpp_func(func):
+    ret_ty = it_to_cpp_ty(func.results[0]) if func.results else 'void'
+    arg_tys = [it_to_cpp_ty(param) for param in func.params]
+    arg_str = ', '.join(arg_tys)
+    return '{} {}({});\n'.format(ret_ty, func.name, arg_str)
 
 # Implementation header, for use by the module itself
-def write_header():
+def write_header(component):
     header_path = os.path.join(outpath, basename + '_impl.h')
     template_path = os.path.join('src', 'c_header_template.h')
     header = open(template_path).read()
+
+    # XXX: this is subtly wrong, but will be fixed by a later tool
+    # the key assumption is that we're the only module, and can thus uniquely
+    # derive a header for a C++ module.
+
+    import_decls = ''
+    for imp, funcs in component.imports.iteritems():
+        for func in funcs:
+            attr = '__attribute__((import_module({}), import_name("{}")))'.format(imp, func.name)
+            import_decls += attr + ' ' + it_to_cpp_func(func)
+    header = header.replace('/**IMPORT_DECLS**/', import_decls)
+
     export_decls = ''
-    for func in ast.exports:
+    for func in component.exports:
+        # XXX: This should not need to have a 1:1 correspondence with the
+        # component's exports, but for convenience it does for the moment
         attr = '__attribute__((export_name("{}")))'.format(func.name)
-        ret_ty = it_to_cpp_ty(func.results[0])
-        arg_tys = [it_to_cpp_ty(param) for param in func.params]
-        arg_str = ', '.join(arg_tys)
-        export_decls += '{} {} {}({});\n'.format(attr, ret_ty, func.name, arg_str)
+        export_decls += attr + ' ' + it_to_cpp_func(func)
     header = header.replace('/**EXPORT_DECLS**/', export_decls)
+
     open(header_path, 'w').write(header)
     print('Wrote header', header_path)
 
 # NodeJS wrapper module
 num_locals = 0
-def write_js_module():
+def write_js_module(component):
     global num_locals # thanks python
     def escape(s):
         return s.replace('\\', '/')
@@ -68,6 +85,12 @@ def write_js_module():
             fn = sexpr[2]
             args = ', '.join([expr(x) for x in sexpr[3:]])
             return '{}[{}]({})'.format(mod_name, fn, args)
+        elif head == 'call-import':
+            assert(len(sexpr) >= 3)
+            mod_name = sexpr[1]
+            fn = sexpr[2]
+            args = ', '.join([expr(x) for x in sexpr[3:]])
+            return 'imports[{}][{}]({})'.format(mod_name, fn, args)
         elif head == 'let':
             assert(len(sexpr) == 2)
             local = 'x' + str(num_locals)
@@ -81,8 +104,45 @@ def write_js_module():
             ptr = expr(sexpr[3])
             length = expr(sexpr[4])
             return 'memToString({}[{}], {}, {})'.format(mod, mem, ptr, length)
+        elif head == 'string-to-mem':
+            assert(len(sexpr) == 5)
+            mod = sexpr[1]
+            mem = sexpr[2]
+            string = expr(sexpr[3])
+            ptr = expr(sexpr[4])
+            return 'stringToMem({}[{}], {}, {})'.format(mod, mem, string, ptr)
+        elif head == 'string-len':
+            assert(len(sexpr) == 2)
+            string = expr(sexpr[1])
+            return '{}.length'.format(string)
+        elif head == '+':
+            assert(len(sexpr) == 3)
+            lhs = expr(sexpr[1])
+            rhs = expr(sexpr[2])
+            return '({} + {})'.format(lhs, rhs)
         else:
-            assert(False)
+            try:
+                n = int(head)
+                return str(n)
+            except:
+                pass
+            assert False, 'Unknown expr: {}'.format(sexpr)
+    def function(func, n_indent):
+        global num_locals
+        ret = ''
+        params = ', '.join(['x' + str(i) for i in range(len(func.params))])
+        ret += tab * n_indent + '{}: function({}) {{\n'.format(func.name, params)
+        num_locals = len(func.params)
+        for i in range(len(func.body)):
+            sexpr = func.body[i]
+            ret += tab * (n_indent + 1)
+            if func.results and i == len(func.body) - 1:
+                ret += 'return ' + expr(sexpr)
+            else:
+                ret += expr(sexpr)
+            ret += ';\n'
+        ret += tab * n_indent + '},\n'
+        return ret
 
     # Paths and setup
     js_path = os.path.join(outpath, basename + '.js')
@@ -90,38 +150,28 @@ def write_js_module():
     js_str = open(template_path).read()
     tab = '    '
 
-    # TODO: imports
-    # imports = ''
-    # js_str = js_str.replace('/**IMPORTS**/\n', imports)
-
     module_names = ''
     load_modules = ''        
-    for mod in ast.modules:
+    for mod in component.modules:
         name = mod.name
         path = mod.path
         module_names += tab * 2 + 'let {};'.format(name)
-        load_modules += tab * 2 + '{} = await loadModule({}, {{}})'.format(name, path)
+        load_modules += tab * 2 + '{} = await loadModule({}, {{\n'.format(name, path)
+        for imp, funcs in mod.imports.iteritems():
+            load_modules += tab * 3 + imp + ': {\n'
+            for func in funcs:
+                load_modules += function(func, n_indent=4)
+            load_modules += tab * 3 + '},\n'
+        load_modules += tab * 2 + '});\n'
     js_str = js_str.replace('/**MODULE_NAMES**/', module_names)
     js_str = js_str.replace('/**LOAD_MODULES**/', load_modules)
 
     exports = ''
-    for func in ast.exports:
-        params = ', '.join(['x' + str(i) for i in range(len(func.params))])
-        exports += tab * 3 + '{}: function({}) {{\n'.format(func.name, params)
-        num_locals = len(func.params)
-        for i in range(len(func.body)):
-            sexpr = func.body[i]
-            exports += tab * 4
-            if func.results and i == len(func.body) - 1:
-                exports += 'return ' + expr(sexpr)
-            else:
-                exports += expr(sexpr)
-            exports += ';\n'
-
-        exports += tab * 3 + '},\n'
+    for func in component.exports:
+        exports += function(func, n_indent=3)
     js_str = js_str.replace('/**EXPORTS**/\n', exports)
     open(js_path, 'w').write(js_str)
     print('Wrote JS module', js_path)
 
-write_header()
-write_js_module()
+write_header(component)
+write_js_module(component)

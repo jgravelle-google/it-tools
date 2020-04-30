@@ -1,13 +1,13 @@
 let fs = require('fs');
 
 module.exports = {
-    instantiate: async function(imported) {
+    instantiate: async function(imports) {
 /**MODULE_NAMES**/
 
         // Loads specified modules
-        async function loadModule(path, imports) {
+        async function loadModule(path, wrappedImports) {
             let contents = fs.readFileSync(path);
-            let wasm = await WebAssembly.instantiate(contents, imports);
+            let wasm = await WebAssembly.instantiate(contents, wrappedImports);
             return wasm.instance.exports;
         }
 
@@ -20,9 +20,16 @@ module.exports = {
             }
             return str;
         }
+        function stringToMem(memory, str, ptr) {
+            let u8 = new Uint8Array(memory.buffer);
+            let len = str.length;
+            for (var i = 0; i < len; ++i) {
+                u8[ptr + i] = str.charCodeAt(i);
+            }
+            return len;
+        }
 
 /**LOAD_MODULES**/
-
         let wrappedExports = {
 /**EXPORTS**/
         };

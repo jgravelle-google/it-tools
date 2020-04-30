@@ -1,12 +1,18 @@
+(module wasm "out/buzz.wasm"
+    (func "isBuzz" (param i32) (result))
+    (func "buzzStr" (param) (result i32))
+    (func "_it_strlen" (param i32) (result i32))
+)
+
 (export
     (func "isBuzz" (param s32) (result u1)
-        (as u1 (call-export "isBuzz" (as i32 (local 0))))
+        (as u1 (call-export wasm "isBuzz" (as i32 (local 0))))
     )
     (func "buzzStr" (param) (result string)
-        (let (call-export "buzzStr"))
-        (mem-to-string "memory"
+        (let (call-export wasm "buzzStr"))
+        (mem-to-string wasm "memory"
             (local 0)
-            (call-export "_it_strlen" (local 0))
+            (call-export wasm "_it_strlen" (local 0))
         )
     )
 )

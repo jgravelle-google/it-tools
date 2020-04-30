@@ -1,20 +1,77 @@
 (import "fizz"
     (func "isFizz" (param s32) (result u1))
+    (func "fizzStr" (param) (result string))
+)
+(import "buzz"
+    (func "isBuzz" (param s32) (result u1))
+    (func "buzzStr" (param) (result string))
+)
+(import "printer"
+    (func "print" (param string) (result))
+    (func "printInt" (param s32) (result)) ;; ok this is a hack
 )
 
-(import "buzz"
-    (func "isBuzz" (param s32) (result u1)
-        (as i32 (call-import "isBuzz" (as i32 (local 0))))
+(module wasm "out/fizzbuzz.wasm"
+    (import "fizz"
+        (func "isFizz" (param i32) (result i32)
+            (as i32
+                (call-import "fizz" "isFizz"
+                    (as s32 (local 0))))
+        )
+        (func "fizzStr" (param) (result i32)
+            (let (call-import "fizz" "fizzStr"))
+            (let (call-export wasm "malloc" (+ (string-len (local 0)) 1)))
+            (string-to-mem wasm "memory"
+                (local 0) ;; str
+                (local 1) ;; ptr
+            )
+            (call-export wasm "_it_writeStringTerm"
+                (local 1)
+                (string-len (local 0))
+            )
+            (local 1)
+        )
     )
-    (func "buzzStr" (param) (result string)
-        (let (call-import "buzzStr"))
-        (let (call-export "malloc" (string-len (local 0))))
-        ;; todo: the rest
+    (import "buzz"
+        (func "isBuzz" (param i32) (result i32)
+            (as i32
+                (call-import "buzz" "isBuzz"
+                    (as s32 (local 0))))
+        )
+        (func "buzzStr" (param) (result i32)
+            (let (call-import "buzz" "buzzStr"))
+            (let (call-export wasm "malloc" (+ (string-len (local 0)) 1)))
+            (string-to-mem wasm "memory"
+                (local 0) ;; str
+                (local 1) ;; ptr
+            )
+            (call-export wasm "_it_writeStringTerm"
+                (local 1)
+                (string-len (local 0))
+            )
+            (local 1)
+        )
     )
+    (import "printer"
+        (func "print" (param i32) (result)
+            (call-import "printer" "print"
+                (mem-to-string wasm "memory"
+                    (local 0)
+                    (call-export wasm "_it_strlen" (local 0))
+                ))
+        )
+        (func "printInt" (param i32) (result)
+            (call-import "printer" "print"
+                (as string (local 0)))
+        )
+    )
+    (func "fizzbuzz" (param i32) (result))
+    (func "_it_strlen" (param i32) (result i32))
+    (func "_it_writeStringTerm" (param i32 i32) (result))
 )
 
 (export
     (func "fizzbuzz" (param s32) (result)
-        (call-export "fizzbuzz" (as i32 (local 0)))
+        (call-export wasm "fizzbuzz" (as i32 (local 0)))
     )
 )
