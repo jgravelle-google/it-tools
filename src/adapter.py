@@ -20,6 +20,7 @@ contents = open(itl_path).read()
 component = itl_parser.parse(contents)
 
 outpath = 'out'
+srcpath = os.path.dirname(__file__)
 ensure_path(outpath)
 
 def it_to_cpp_ty(ty):
@@ -38,7 +39,7 @@ def it_to_cpp_func(func):
 # Implementation header, for use by the module itself
 def write_header(component):
     header_path = os.path.join(outpath, basename + '_impl.h')
-    template_path = os.path.join('src', 'c_header_template.h')
+    template_path = os.path.join(srcpath, 'c_header_template.h')
     header = open(template_path).read()
 
     # XXX: this is subtly wrong, but will be fixed by a later tool
@@ -146,7 +147,7 @@ def write_js_module(component):
 
     # Paths and setup
     js_path = os.path.join(outpath, basename + '.js')
-    template_path = os.path.join('src', 'wrapper_module_template.js')
+    template_path = os.path.join(srcpath, 'wrapper_module_template.js')
     js_str = open(template_path).read()
     tab = '    '
 

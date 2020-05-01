@@ -13,24 +13,30 @@ def run(cmd):
     return subprocess.check_output(cmd)
 
 watchpath = sys.argv[1]
-print('watchpath:', watchpath)
-times = {}
+assert(sys.argv[2] == '--')
+cmd = sys.argv[3:]
+print 'watchpath:', watchpath
+print 'command:', cmd
 
-while True:
+times = {}
+def update_times():
+    updated = False
     for path, _, files in os.walk(watchpath):
         for name in files:
-            cmd = []
             base, ext = os.path.splitext(name)
             filename = os.path.join(path, name)
             mtime = os.path.getmtime(filename)
             if times.get(filename) != mtime:
-                if ext == '.itl':
-                    cmd = ['python', os.path.join('src', 'adapter.py'), filename]
+                updated = True
             times[filename] = mtime
-            if cmd:
-                try:
-                    print(run(cmd))
-                except Exception as e:
-                    print('failed:', e)
+    return updated
+while True:
+    if update_times():
+        try:
+            print run(cmd)
+        except Exception as e:
+            print 'failed:', e
+        # re-cache times for any build artifacts
+        update_times()
     sys.stdout.flush()
     time.sleep(0.25)
