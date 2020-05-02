@@ -10,7 +10,7 @@ import time
 def run(cmd):
     now = time.asctime()
     print('[{}] : running {}'.format(now, cmd))
-    return subprocess.check_output(cmd)
+    subprocess.check_call(cmd, stderr=subprocess.PIPE)
 
 watchpath = sys.argv[1]
 assert(sys.argv[2] == '--')
@@ -33,7 +33,9 @@ def update_times():
 while True:
     if update_times():
         try:
-            print run(cmd)
+            print ''
+            sys.stdout.flush()
+            run(cmd)
         except Exception as e:
             print 'failed:', e
         # re-cache times for any build artifacts
