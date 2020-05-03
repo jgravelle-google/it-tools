@@ -4,41 +4,71 @@
 
 import os
 import sys
+import traceback
 
 def main():
+    srcpath = os.path.dirname(__file__)
     outpath = 'out'
     ensure_path(outpath)
 
+    # Paths
     cpp_in = sys.argv[1]
     basename, _ = os.path.splitext(cpp_in)
     h_out = os.path.join(outpath, basename + '_impl.h')
     cpp_out = os.path.join(outpath, cpp_in)
     itl_out = os.path.join(outpath, basename + '.itl')
 
+    # read + parse
     contents = open(cpp_in).read()
     start_str, end_str = '/**IT_START**/', '/**IT_END**/'
     start = contents.find(start_str) + len(start_str)
     end = contents.find(end_str)
     it_contents = contents[start:end]
+    ast = parse_it(it_contents)
+
+    # Write output .cpp file
     cpp_contents = (
         contents[:start-len(start_str)] +
         # Add an include to the generated header file
         '#include "' + h_out + '"\n' +
         contents[end+len(end_str):]
     )
-
-    # The .cpp is done at this point; write it out
     open(cpp_out, 'w').write(cpp_contents)
 
-    parse_it(it_contents)
+    # Write .h file
+    template_path = os.path.join(srcpath, 'c_header_template.h')
+    h_contents = open(template_path).read()
+    def it_to_cpp(ty):
+        mapping = {
+            'u1': 'bool',
+            's32': 'int',
+            'string': 'const char*',
+        }
+        return mapping[ty]
+    export_decls = ''
+    for ex in ast.exports:
+        args = [it_to_cpp(arg) for arg in ex.args]
+        ret = it_to_cpp(ex.ret)
+        export_decls += '__attribute__((export_name("{}"))) {} {}({});\n'.format(
+            ex.name, ret, ex.name, ', '.join(args))
+    h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
+    print h_contents
+    open(h_out, 'w').write(h_contents)
+
+class AST(object):
+    def __init__(self, imports, exports):
+        self.imports = imports
+        self.exports = exports
+class Func(object):
+    def __init__(self, name, args, ret):
+        self.name = name
+        self.args = args
+        self.ret = ret
 
 def parse_it(contents):
-    try:
-        tokens = Lexer(contents).lex()
-        ast = Parser(tokens).parse()
-        print "AST", ast
-    except Exception as e:
-        print '[ERROR]:', e
+    tokens = Lexer(contents).lex()
+    ast = Parser(tokens).parse()
+    return ast
 
 class Lexer(object):
     def __init__(self, contents):
@@ -85,7 +115,7 @@ class Parser(object):
                     else:
                         self.expect('}')
                         break
-        return imports, exports
+        return AST(imports, exports)
 
     def parse_func(self):
         self.expect('func')
@@ -104,7 +134,7 @@ class Parser(object):
         else:
             ret = 'void'
         self.expect(';')
-        return (name, args, ret)
+        return Func(name, args, ret)
 
     # Helper funcs
     def peek(self):
@@ -133,4 +163,9 @@ def ensure_path(path):
         pass
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        trace = traceback.format_exc(e)
+        print trace
+        sys.exit(1)
