@@ -33,9 +33,12 @@ def main():
     parse_it(it_contents)
 
 def parse_it(contents):
-    tokens = Lexer(contents).lex()
-    ast = Parser(tokens).parse()
-    print "AST", ast
+    try:
+        tokens = Lexer(contents).lex()
+        ast = Parser(tokens).parse()
+        print "AST", ast
+    except Exception as e:
+        print '[ERROR]:', e
 
 class Lexer(object):
     def __init__(self, contents):
@@ -56,7 +59,7 @@ class Lexer(object):
             self.i += 1
             if c in ' \n\r\t':
                 self.term()
-            elif c in '(){};':
+            elif c in '(){},;':
                 self.term()
                 self.tokens.append(c)
             else:
@@ -69,34 +72,59 @@ class Parser(object):
         self.i = 0
         self.tokens = tokens
 
-    def expect(self, ex):
-        assert self.tokens[self.i] == ex, 'Expected "{}", got "{}"'.format(ex, tokens[i])
-        self.i += 1
-
-    def peek(self):
-        return self.tokens[self.i]
-    def pop(self):
-        ret = self.peek()
-        self.i += 1
-        return ret
-
-    def parse_func(self):
-        self.expect('func')
-        return '<<func>>'
-
     def parse(self):
-        print self.tokens
         imports = {}
         exports = []
         while self.i < len(self.tokens):
             head = self.pop()
             if head == 'export':
                 self.expect('{')
-                if self.peek() == 'func':
-                    exports.append(self.parse_func())
-                else:
-                    self.expect('}')
+                while True:
+                    if self.peek() == 'func':
+                        exports.append(self.parse_func())
+                    else:
+                        self.expect('}')
+                        break
         return imports, exports
+
+    def parse_func(self):
+        self.expect('func')
+        name = self.pop()
+        self.expect('(')
+
+        args = self.until(')')
+        if len(args):
+            # validate comma-separated arguments
+            assert len(args) % 2 == 1, 'unbalanced commas and args : ' + str(args)
+            args, commas = args[::2], args[1::2]
+            assert all(x == ',' for x in commas), 'args must be comma-separated : ' + str(args)
+
+        if self.check('->'):
+            ret = self.pop()
+        else:
+            ret = 'void'
+        self.expect(';')
+        return (name, args, ret)
+
+    # Helper funcs
+    def peek(self):
+        return self.tokens[self.i]
+    def pop(self):
+        ret = self.peek()
+        self.i += 1
+        return ret
+    def check(self, tok):
+        if self.peek() == tok:
+            return self.pop()
+        return None
+    def expect(self, tok):
+        assert self.pop() == tok, 'Expected "{}", got "{}"'.format(tok, self.tokens[self.i])
+    def until(self, tok):
+        ret = []
+        while self.peek() != tok:
+            ret.append(self.pop())
+        self.expect(tok)
+        return ret
 
 def ensure_path(path):
     try:
