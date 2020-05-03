@@ -38,21 +38,30 @@ def main():
     # Write .h file
     template_path = os.path.join(srcpath, 'c_header_template.h')
     h_contents = open(template_path).read()
-    def it_to_cpp(ty):
+    def it_to_cpp_ty(ty):
         mapping = {
             'u1': 'bool',
             's32': 'int',
             'string': 'const char*',
+            'void': 'void',
         }
         return mapping[ty]
+    def it_to_cpp_func(func):
+        ret_ty = it_to_cpp_ty(func.ret)
+        arg_tys = [it_to_cpp_ty(arg) for arg in func.args]
+        arg_str = ', '.join(arg_tys)
+        return '{} {}({});\n'.format(ret_ty, func.name, arg_str)
+    import_decls = ''
+    for imp, funcs in ast.imports.iteritems():
+        for func in funcs:
+            attr = '__attribute__((import_module({}), import_name("{}")))'.format(imp, func.name)
+            import_decls += attr + ' ' + it_to_cpp_func(func)
+    h_contents = h_contents.replace('/**IMPORT_DECLS**/', import_decls)
     export_decls = ''
-    for ex in ast.exports:
-        args = [it_to_cpp(arg) for arg in ex.args]
-        ret = it_to_cpp(ex.ret)
-        export_decls += '__attribute__((export_name("{}"))) {} {}({});\n'.format(
-            ex.name, ret, ex.name, ', '.join(args))
+    for func in ast.exports:
+        attr = '__attribute__((export_name("{}")))'.format(func.name)
+        export_decls += attr + ' ' + it_to_cpp_func(func)
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
-    print h_contents
     open(h_out, 'w').write(h_contents)
 
 class AST(object):
