@@ -26,6 +26,8 @@ def main():
     it_contents = contents[start:end]
     ast = parse_it(it_contents)
 
+    #############################################
+
     # Write output .cpp file
     cpp_contents = (
         contents[:start-len(start_str)] +
@@ -34,6 +36,8 @@ def main():
         contents[end+len(end_str):]
     )
     open(cpp_out, 'w').write(cpp_contents)
+
+    #############################################
 
     # Write .h file
     template_path = os.path.join(srcpath, 'c_header_template.h')
@@ -63,6 +67,38 @@ def main():
         export_decls += attr + ' ' + it_to_cpp_func(func)
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
     open(h_out, 'w').write(h_contents)
+
+    #############################################
+
+    # Write .itl file
+    tab = '    '
+
+    # Wasm module
+    def it_to_wasm_ty(ty):
+        return 'i32'
+    def it_to_wasm_func(func):
+        args = [it_to_wasm_ty(ty) for ty in func.args]
+        ret = it_to_wasm_ty(func.ret) if func.ret != 'void' else ''
+        return '(func "{}" (param {}) (result {}))\n'.format(
+            func.name, ' '.join(args), ret)
+    itl_contents = '(module wasm "{}"\n'
+    builtins = [
+        Func('_it_strlen', ['string'], 's32'),
+    ]
+    for func in ast.exports + builtins:
+        itl_contents += tab + it_to_wasm_func(func)
+    itl_contents += ')\n\n'
+
+    # ITL exports
+    itl_contents += '(export\n'
+    for func in ast.exports:
+        ret = func.ret if func.ret != 'void' else ''
+        itl_contents += tab + '(func "{}" (param {}) (result {})\n'.format(
+            func.name, ' '.join(func.args), ret)
+        itl_contents += tab + ')\n'
+    itl_contents += ')\n\n'
+
+    open(itl_out, 'w').write(itl_contents)
 
 class AST(object):
     def __init__(self, imports, exports):
