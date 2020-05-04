@@ -7,7 +7,7 @@ build: out out/fizz.wasm out/buzz.wasm out/fizzbuzz.wasm
 out:
 	mkdir -p out
 
-out/%_impl.h: %.itl
+out/%.js out/%_impl.h: %.itl
 	python ../adapter.py $<
 
 out/%.wasm: %.cpp out/%_impl.h

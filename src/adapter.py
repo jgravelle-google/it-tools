@@ -5,24 +5,30 @@
 
 import os
 import sys
+import traceback
 
 import itl_parser
+
+outpath = 'out'
+itl_path = sys.argv[1]
+itl_filename = os.path.basename(itl_path)
+basename, _ = os.path.splitext(itl_filename)
+srcpath = os.path.dirname(__file__)
+
+def main():
+    contents = open(itl_path).read()
+    component = itl_parser.parse(contents)
+
+    ensure_path(outpath)
+
+    write_header(component)
+    write_js_module(component)
 
 def ensure_path(path):
     try:
         os.makedirs(path)
     except:
         pass
-
-itl_path = sys.argv[1]
-itl_filename = os.path.basename(itl_path)
-basename, _ = os.path.splitext(itl_filename)
-contents = open(itl_path).read()
-component = itl_parser.parse(contents)
-
-outpath = 'out'
-srcpath = os.path.dirname(__file__)
-ensure_path(outpath)
 
 def it_to_cpp_ty(ty):
     TYPES = {
@@ -81,18 +87,22 @@ def write_js_module(component):
         elif head == 'local':
             assert(len(sexpr) == 2)
             return 'x' + sexpr[1]
-        elif head == 'call-export':
-            assert(len(sexpr) >= 3)
-            mod_name = sexpr[1]
-            fn = sexpr[2]
-            args = ', '.join([expr(x) for x in sexpr[3:]])
-            return '{}[{}]({})'.format(mod_name, fn, args)
+        elif head == 'call':
+            assert(len(sexpr) >= 2)
+            func_name = sexpr[1]
+            args = ', '.join([expr(x) for x in sexpr[2:]])
+            func = component.all_funcs[func_name]
+            if func.location[0] == 'import':
+                mod_name = func.location[1]
+                return 'imports["{}"]["{}"]({})'.format(mod_name, func_name, args)
+            elif func.location[0] == 'module':
+                mod_name = func.location[1]
+                return '{}["{}"]({})'.format(mod_name, func_name, args)
         elif head == 'call-import':
             assert(len(sexpr) >= 3)
             mod_name = sexpr[1]
             fn = sexpr[2]
             args = ', '.join([expr(x) for x in sexpr[3:]])
-            return 'imports[{}][{}]({})'.format(mod_name, fn, args)
         elif head == 'let':
             assert(len(sexpr) == 2)
             local = 'x' + str(num_locals)
@@ -128,12 +138,12 @@ def write_js_module(component):
                 return str(n)
             except:
                 pass
-            assert False, 'Unknown expr: {}'.format(sexpr)
+        assert False, 'Unknown expr: {}'.format(sexpr)
     def function(func, n_indent):
         global num_locals
         ret = ''
         params = ', '.join(['x' + str(i) for i in range(len(func.params))])
-        ret += tab * n_indent + '{}: function({}) {{\n'.format(func.name, params)
+        ret += tab * n_indent + '"{}": function({}) {{\n'.format(func.exname, params)
         num_locals = len(func.params)
         for i in range(len(func.body)):
             sexpr = func.body[i]
@@ -158,7 +168,7 @@ def write_js_module(component):
         name = mod.name
         path = mod.path
         module_names += tab * 2 + 'let {};'.format(name)
-        load_modules += tab * 2 + '{} = await loadModule({}, {{\n'.format(name, path)
+        load_modules += tab * 2 + '{} = await loadModule("{}", {{\n'.format(name, path)
         for imp, funcs in mod.imports.iteritems():
             load_modules += tab * 3 + imp + ': {\n'
             for func in funcs:
@@ -175,5 +185,10 @@ def write_js_module(component):
     open(js_path, 'w').write(js_str)
     print('Wrote JS module', js_path)
 
-write_header(component)
-write_js_module(component)
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as e:
+        trace = traceback.format_exc(e)
+        print trace
+        sys.exit(1)

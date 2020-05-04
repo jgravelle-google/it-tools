@@ -95,6 +95,18 @@ def main():
         ret = func.ret if func.ret != 'void' else ''
         itl_contents += tab + '(func "{}" (param {}) (result {})\n'.format(
             func.name, ' '.join(func.args), ret)
+        args = ''
+        for i, arg in enumerate(func.args):
+            local = '(local {})'.format(i)
+            if arg == 's32':
+                cur = '(as i32 {})'.format(local)
+            args += '\n' + tab * 3 + cur
+        call = '(call-export wasm "{}"{})'.format(func.name, args)
+        if func.ret in ['u1', 's32']:
+            body = '(as {} {})'.format(func.ret, call)
+        elif func.ret == 'string':
+            body = '(do string stuff: {})'.format(call)
+        itl_contents += tab * 2 + body + '\n'
         itl_contents += tab + ')\n'
     itl_contents += ')\n\n'
 
