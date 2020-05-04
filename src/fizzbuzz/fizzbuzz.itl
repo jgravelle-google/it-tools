@@ -1,33 +1,33 @@
 (import "fizz"
-    (func "isFizz" (param s32) (result u1))
-    (func "fizzStr" (param) (result string))
+    (func isFizz "isFizz" (param s32) (result u1))
+    (func fizzStr "fizzStr" (param) (result string))
 )
 (import "buzz"
-    (func "isBuzz" (param s32) (result u1))
-    (func "buzzStr" (param) (result string))
+    (func isBuzz "isBuzz" (param s32) (result u1))
+    (func buzzStr "buzzStr" (param) (result string))
 )
 (import "console"
-    (func "log" (param string) (result))
+    (func log "log" (param string) (result))
     ;; XXX: function names here are a hack for C++ codegen
-    (func "print" (param string) (result))
-    (func "printInt" (param s32) (result))
+    (func print "print" (param string) (result))
+    (func printInt "printInt" (param s32) (result))
 )
 
 (module wasm "out/fizzbuzz.wasm"
     (import "fizz"
-        (func "isFizz" (param i32) (result i32)
+        (func _ "isFizz" (param i32) (result i32)
             (as i32
-                (call-import "fizz" "isFizz"
+                (call isFizz
                     (as s32 (local 0))))
         )
-        (func "fizzStr" (param) (result i32)
-            (let (call-import "fizz" "fizzStr"))
-            (let (call-export wasm "malloc" (+ (string-len (local 0)) 1)))
+        (func _ "fizzStr" (param) (result i32)
+            (let (call fizzStr))
+            (let (call malloc (+ (string-len (local 0)) 1)))
             (string-to-mem wasm "memory"
                 (local 0) ;; str
                 (local 1) ;; ptr
             )
-            (call-export wasm "_it_writeStringTerm"
+            (call _it_writeStringTerm
                 (local 1)
                 (string-len (local 0))
             )
@@ -35,19 +35,19 @@
         )
     )
     (import "buzz"
-        (func "isBuzz" (param i32) (result i32)
+        (func _ "isBuzz" (param i32) (result i32)
             (as i32
-                (call-import "buzz" "isBuzz"
+                (call isBuzz
                     (as s32 (local 0))))
         )
-        (func "buzzStr" (param) (result i32)
-            (let (call-import "buzz" "buzzStr"))
-            (let (call-export wasm "malloc" (+ (string-len (local 0)) 1)))
+        (func _ "buzzStr" (param) (result i32)
+            (let (call buzzStr))
+            (let (call malloc (+ (string-len (local 0)) 1)))
             (string-to-mem wasm "memory"
                 (local 0) ;; str
                 (local 1) ;; ptr
             )
-            (call-export wasm "_it_writeStringTerm"
+            (call _it_writeStringTerm
                 (local 1)
                 (string-len (local 0))
             )
@@ -55,25 +55,26 @@
         )
     )
     (import "console"
-        (func "print" (param i32) (result)
-            (call-import "console" "log"
+        (func _ "print" (param i32) (result)
+            (call log
                 (mem-to-string wasm "memory"
                     (local 0)
-                    (call-export wasm "_it_strlen" (local 0))
+                    (call _it_strlen (local 0))
                 ))
         )
-        (func "printInt" (param i32) (result)
-            (call-import "console" "log"
+        (func _ "printInt" (param i32) (result)
+            (call log
                 (as string (local 0)))
         )
     )
-    (func "fizzbuzz" (param i32) (result))
-    (func "_it_strlen" (param i32) (result i32))
-    (func "_it_writeStringTerm" (param i32 i32) (result))
+    (func fizzbuzz "fizzbuzz" (param i32) (result))
+    (func malloc "malloc" (param i32) (result i32))
+    (func _it_strlen "_it_strlen" (param i32) (result i32))
+    (func _it_writeStringTerm "_it_writeStringTerm" (param i32 i32) (result))
 )
 
 (export
-    (func "fizzbuzz" (param s32) (result)
-        (call-export wasm "fizzbuzz" (as i32 (local 0)))
+    (func _ "fizzbuzz" (param s32) (result)
+        (call fizzbuzz (as i32 (local 0)))
     )
 )

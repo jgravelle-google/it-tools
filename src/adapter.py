@@ -41,7 +41,7 @@ def it_to_cpp_func(func):
     ret_ty = it_to_cpp_ty(func.results[0]) if func.results else 'void'
     arg_tys = [it_to_cpp_ty(param) for param in func.params]
     arg_str = ', '.join(arg_tys)
-    return '{} {}({});\n'.format(ret_ty, func.name, arg_str)
+    return '{} {}({});\n'.format(ret_ty, func.exname, arg_str)
 
 # Implementation header, for use by the module itself
 def write_header(component):
@@ -56,7 +56,7 @@ def write_header(component):
     import_decls = ''
     for imp, funcs in component.imports.iteritems():
         for func in funcs:
-            attr = '__attribute__((import_module({}), import_name("{}")))'.format(imp, func.name)
+            attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.exname)
             import_decls += attr + ' ' + it_to_cpp_func(func)
     header = header.replace('/**IMPORT_DECLS**/', import_decls)
 
@@ -64,7 +64,7 @@ def write_header(component):
     for func in component.exports:
         # XXX: This should not need to have a 1:1 correspondence with the
         # component's exports, but for convenience it does for the moment
-        attr = '__attribute__((export_name("{}")))'.format(func.name)
+        attr = '__attribute__((export_name("{}")))'.format(func.exname)
         export_decls += attr + ' ' + it_to_cpp_func(func)
     header = header.replace('/**EXPORT_DECLS**/', export_decls)
 
