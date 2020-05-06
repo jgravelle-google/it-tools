@@ -2,7 +2,7 @@
 #     node shell.js
 # .PHONY: run
 
-build: out out/fizz.js out/fizz.wasm
+build: out out/fizz.js out/fizz.wasm out/fizz.itl
 # out/buzz.wasm out/fizzbuzz.wasm
 
 out:
@@ -14,5 +14,5 @@ out/%.itl: %.cpp
 out/%.js out/%_impl.h: out/%.itl
 	python ../adapter.py $<
 
-out/%.wasm: %.cpp out/%_impl.h
-	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -Iout -std=c++11
+out/%.wasm: out/%.cpp out/%_impl.h
+	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -Iout -I. -std=c++11

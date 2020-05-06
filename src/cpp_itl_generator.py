@@ -14,7 +14,8 @@ def main():
     # Paths
     cpp_in = sys.argv[1]
     basename, _ = os.path.splitext(cpp_in)
-    h_out = os.path.join(outpath, basename + '_impl.h')
+    # h_out = os.path.join(outpath, basename + '_impl.h')
+    h_out = outpath + '/' + basename + '_impl.h'
     cpp_out = os.path.join(outpath, cpp_in)
     itl_out = os.path.join(outpath, basename + '.itl')
 
@@ -75,15 +76,19 @@ def main():
 
     # Wasm module
     def it_to_wasm_ty(ty):
+        if ty == 'void':
+            return ''
         return 'i32'
     def it_to_wasm_func(func):
         args = [it_to_wasm_ty(ty) for ty in func.args]
         ret = it_to_wasm_ty(func.ret) if func.ret != 'void' else ''
-        return '(func "{}" (param {}) (result {}))\n'.format(
-            func.name, ' '.join(args), ret)
+        return '(func {} "{}" (param {}) (result {}))\n'.format(
+            func.name, func.name, ' '.join(args), ret)
     itl_contents = '(module wasm "{}"\n'
     builtins = [
+        Func('malloc', ['string'], 's32'),
         Func('_it_strlen', ['string'], 's32'),
+        Func('_it_writeStringTerm', ['string', 's32'], 'void'),
     ]
     for func in ast.exports + builtins:
         itl_contents += tab + it_to_wasm_func(func)
@@ -93,7 +98,7 @@ def main():
     itl_contents += '(export\n'
     for func in ast.exports:
         ret = func.ret if func.ret != 'void' else ''
-        itl_contents += tab + '(func "{}" (param {}) (result {})\n'.format(
+        itl_contents += tab + '(func _ "{}" (param {}) (result {})\n'.format(
             func.name, ' '.join(func.args), ret)
         args = ''
         for i, arg in enumerate(func.args):
@@ -101,14 +106,39 @@ def main():
             if arg == 's32':
                 cur = '(as i32 {})'.format(local)
             args += '\n' + tab * 3 + cur
-        call = '(call-export wasm "{}"{})'.format(func.name, args)
+        call = '(call {}{})'.format(func.name, args)
         if func.ret in ['u1', 's32']:
             body = '(as {} {})'.format(func.ret, call)
         elif func.ret == 'string':
-            body = '(do string stuff: {})'.format(call)
+            body = '(call _it_cppToString {})'.format(call)
         itl_contents += tab * 2 + body + '\n'
         itl_contents += tab + ')\n'
     itl_contents += ')\n\n'
+
+    # builtin helpers
+    itl_contents += '''
+(func _it_cppToString "" (param i32) (result string)
+    ;; helper function to convert strings as a unary expression
+    (mem-to-string wasm "memory"
+        (local 0)
+        (call _it_strlen (local 0))
+    )
+)
+(func _it_stringToCpp "" (param string) (result i32)
+    ;; helper function to convert strings as a unary expression
+    (let (call malloc (+ (string-len (local 0)) 1)))
+    (string-to-mem wasm "memory"
+        (local 0) ;; str
+        (local 1) ;; ptr
+    )
+    (call _it_writeStringTerm
+        (local 1)
+        (string-len (local 0))
+    )
+    (local 1)
+)
+
+'''
 
     open(itl_out, 'w').write(itl_contents)
 

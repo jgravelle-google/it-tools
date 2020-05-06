@@ -9,6 +9,7 @@
         (as u1 (call isBuzz (as i32 (local 0))))
     )
     (func _ "buzzStr" (param) (result string)
+        ;; can copy strings inline (using `let`)
         (let (call buzzStr))
         (mem-to-string wasm "memory"
             (local 0)
