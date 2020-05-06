@@ -18,6 +18,7 @@ def main():
     h_out = outpath + '/' + basename + '_impl.h'
     cpp_out = os.path.join(outpath, cpp_in)
     itl_out = os.path.join(outpath, basename + '.itl')
+    wasm_out = outpath + '/' + basename + '.wasm'
 
     # read + parse
     contents = open(cpp_in).read()
@@ -59,7 +60,7 @@ def main():
     import_decls = ''
     for imp, funcs in ast.imports.iteritems():
         for func in funcs:
-            attr = '__attribute__((import_module({}), import_name("{}")))'.format(imp, func.name)
+            attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.name)
             import_decls += attr + ' ' + it_to_cpp_func(func)
     h_contents = h_contents.replace('/**IMPORT_DECLS**/', import_decls)
     export_decls = ''
@@ -73,8 +74,9 @@ def main():
 
     # Write .itl file
     tab = '    '
+    itl_contents = ''
 
-    # Wasm module
+    # ITL Imports
     def it_to_wasm_ty(ty):
         if ty == 'void':
             return ''
@@ -82,16 +84,56 @@ def main():
     def it_to_wasm_func(func):
         args = [it_to_wasm_ty(ty) for ty in func.args]
         ret = it_to_wasm_ty(func.ret) if func.ret != 'void' else ''
-        return '(func {} "{}" (param {}) (result {}))\n'.format(
+        return '(func {} "{}" (param {}) (result {}))'.format(
             func.name, func.name, ' '.join(args), ret)
-    itl_contents = '(module wasm "{}"\n'
+    for imp, funcs in ast.imports.iteritems():
+        itl_contents += '(import "{}"\n'.format(imp)
+        for func in funcs:
+            ret = func.ret if func.ret != 'void' else ''
+            itl_contents += tab + '(func {} "{}" (param {}) (result {}))\n'.format(
+                func.name, func.name, ' '.join(func.args), ret)
+        itl_contents += ')\n'
+
+    # Wasm module
+    def lift(ty, expr):
+        # C++ -> IT
+        if ty in ['u1', 's32']:
+            return '(as {} {})'.format(ty, expr)
+        elif ty == 'string':
+            return '(call _it_cppToString {})'.format(expr)
+        elif ty == 'void':
+            return expr
+        assert False, 'unknown lifting type: ' + ty
+    def lower(ty, expr):
+        if ty in ['u1', 's32']:
+            return '(as i32 {})'.format(expr)
+        elif ty == 'string':
+            return '(call _it_stringToCpp {})'.format(expr)
+        elif ty == 'void':
+            return expr
+        assert False, 'unknown lowering type: ' + ty
+    itl_contents += '\n(module wasm "{}"\n'.format(wasm_out)
+    for imp, funcs in ast.imports.iteritems():
+        itl_contents += tab + '(import "{}"\n'.format(imp)
+        for func in funcs:
+            ret = func.ret if func.ret != 'void' else ''
+            itl_contents += tab * 2 + '(func _ "{}" (param {}) (result {})\n'.format(
+                func.name, ' '.join(func.args), ret)
+            args = ''
+            for i, arg in enumerate(func.args):
+                local = '(local {})'.format(i)
+                args += '\n' + tab * 4 + lift(arg, local)
+            call = '(call {}{})'.format(func.name, args)
+            body = lower(func.ret, call)
+            itl_contents += tab * 3 + body + ')\n'
+        itl_contents += tab + ')\n'
     builtins = [
         Func('malloc', ['string'], 's32'),
         Func('_it_strlen', ['string'], 's32'),
         Func('_it_writeStringTerm', ['string', 's32'], 'void'),
     ]
     for func in ast.exports + builtins:
-        itl_contents += tab + it_to_wasm_func(func)
+        itl_contents += tab + it_to_wasm_func(func) + '\n'
     itl_contents += ')\n\n'
 
     # ITL exports
@@ -103,14 +145,9 @@ def main():
         args = ''
         for i, arg in enumerate(func.args):
             local = '(local {})'.format(i)
-            if arg == 's32':
-                cur = '(as i32 {})'.format(local)
-            args += '\n' + tab * 3 + cur
+            args += '\n' + tab * 3 + lower(arg, local)
         call = '(call {}{})'.format(func.name, args)
-        if func.ret in ['u1', 's32']:
-            body = '(as {} {})'.format(func.ret, call)
-        elif func.ret == 'string':
-            body = '(call _it_cppToString {})'.format(call)
+        body = lift(func.ret, call)
         itl_contents += tab * 2 + body + '\n'
         itl_contents += tab + ')\n'
     itl_contents += ')\n\n'
@@ -202,6 +239,19 @@ class Parser(object):
                     else:
                         self.expect('}')
                         break
+            elif head == 'import':
+                name = unquote(self.pop())
+                self.expect('{')
+                funcs = []
+                while True:
+                    if self.peek() == 'func':
+                        funcs.append(self.parse_func())
+                    else:
+                        self.expect('}')
+                        break
+                imports[name] = funcs
+            else:
+                assert False, 'unknown top-level stmt'
         return AST(imports, exports)
 
     def parse_func(self):
@@ -242,6 +292,10 @@ class Parser(object):
             ret.append(self.pop())
         self.expect(tok)
         return ret
+
+def unquote(name):
+    assert(name[0] == '"' and name[-1] == '"')
+    return name[1:-1]
 
 def ensure_path(path):
     try:
