@@ -29,6 +29,8 @@ module.exports = {
             return len;
         }
 
+/**COMPONENT_FUNCTIONS**/
+
 /**LOAD_MODULES**/
         let wrappedExports = {
 /**EXPORTS**/

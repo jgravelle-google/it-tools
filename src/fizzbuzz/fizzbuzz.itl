@@ -13,6 +13,20 @@
     (func printInt "printInt" (param s32) (result))
 )
 
+(func stringToCpp "" (param string) (result i32)
+    ;; helper function to convert strings as a unary expression
+    (let (call malloc (+ (string-len (local 0)) 1)))
+    (string-to-mem wasm "memory"
+        (local 0) ;; str
+        (local 1) ;; ptr
+    )
+    (call _it_writeStringTerm
+        (local 1)
+        (string-len (local 0))
+    )
+    (local 1)
+)
+
 (module wasm "out/fizzbuzz.wasm"
     (import "fizz"
         (func _ "isFizz" (param i32) (result i32)
@@ -21,17 +35,7 @@
                     (as s32 (local 0))))
         )
         (func _ "fizzStr" (param) (result i32)
-            (let (call fizzStr))
-            (let (call malloc (+ (string-len (local 0)) 1)))
-            (string-to-mem wasm "memory"
-                (local 0) ;; str
-                (local 1) ;; ptr
-            )
-            (call _it_writeStringTerm
-                (local 1)
-                (string-len (local 0))
-            )
-            (local 1)
+            (call stringToCpp (call fizzStr))
         )
     )
     (import "buzz"
@@ -41,17 +45,7 @@
                     (as s32 (local 0))))
         )
         (func _ "buzzStr" (param) (result i32)
-            (let (call buzzStr))
-            (let (call malloc (+ (string-len (local 0)) 1)))
-            (string-to-mem wasm "memory"
-                (local 0) ;; str
-                (local 1) ;; ptr
-            )
-            (call _it_writeStringTerm
-                (local 1)
-                (string-len (local 0))
-            )
-            (local 1)
+            (call stringToCpp (call buzzStr))
         )
     )
     (import "console"

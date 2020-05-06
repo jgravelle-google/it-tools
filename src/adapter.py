@@ -98,6 +98,10 @@ def write_js_module(component):
             elif func.location[0] == 'module':
                 mod_name = func.location[1]
                 return '{}["{}"]({})'.format(mod_name, func_name, args)
+            elif func.location[0] == 'component':
+                return '{}({})'.format(func_name, args)
+            else:
+                assert False, 'Unknown location for func: ' + str(func.location)
         elif head == 'call-import':
             assert(len(sexpr) >= 3)
             mod_name = sexpr[1]
@@ -139,11 +143,15 @@ def write_js_module(component):
             except:
                 pass
         assert False, 'Unknown expr: {}'.format(sexpr)
-    def function(func, n_indent):
+    def function(func, n_indent, is_internal=False):
         global num_locals
         ret = ''
         params = ', '.join(['x' + str(i) for i in range(len(func.params))])
-        ret += tab * n_indent + '"{}": function({}) {{\n'.format(func.exname, params)
+        if is_internal:
+            decl = 'function {}'.format(func.name)
+        else:
+            decl = '"{}": function'.format(func.exname)
+        ret += tab * n_indent + '{}({}) {{\n'.format(decl, params)
         num_locals = len(func.params)
         for i in range(len(func.body)):
             sexpr = func.body[i]
@@ -153,7 +161,10 @@ def write_js_module(component):
             else:
                 ret += expr(sexpr)
             ret += ';\n'
-        ret += tab * n_indent + '},\n'
+        if is_internal:
+            ret += tab * n_indent + '};\n'
+        else:
+            ret += tab * n_indent + '},\n'
         return ret
 
     # Paths and setup
@@ -177,6 +188,11 @@ def write_js_module(component):
         load_modules += tab * 2 + '});\n'
     js_str = js_str.replace('/**MODULE_NAMES**/', module_names)
     js_str = js_str.replace('/**LOAD_MODULES**/', load_modules)
+
+    component_functions = ''
+    for func in component.funcs:
+        component_functions += function(func, n_indent=2, is_internal=True)
+    js_str = js_str.replace('/**COMPONENT_FUNCTIONS**/\n', component_functions)
 
     exports = ''
     for func in component.exports:

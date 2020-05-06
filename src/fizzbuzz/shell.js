@@ -8,7 +8,13 @@ async function run() {
     });
 
     // Run it
-    fizzbuzz.fizzbuzz(20);
+    try {
+        fizzbuzz.fizzbuzz(20);
+    } catch (e) {
+        // Echo errors on stdout so make prints them
+        console.log('[[shell.js ERROR]]')
+        console.log(e);
+    }
 }
 
 run();

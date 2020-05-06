@@ -9,6 +9,7 @@ class Component(object):
         self.imports = {} # imports to the component
         self.exports = [] # exports from the component
         self.modules = [] # modules wrapped by the component
+        self.funcs = [] # component-local functions
         
         # lookup table for all functions by name
         self.all_funcs = {}
@@ -115,5 +116,10 @@ def parse(body):
             component.imports[name] = funcs
             for func in funcs:
                 component.add_func(func)
+        elif group[0] == 'func':
+            # Component-only functions
+            func = Func(group, ['component'])
+            component.funcs.append(func)
+            component.add_func(func)
 
     return component
