@@ -21,7 +21,6 @@ def main():
 
     ensure_path(outpath)
 
-    write_header(component)
     write_js_module(component)
 
 def ensure_path(path):
@@ -42,34 +41,6 @@ def it_to_cpp_func(func):
     arg_tys = [it_to_cpp_ty(param) for param in func.params]
     arg_str = ', '.join(arg_tys)
     return '{} {}({});\n'.format(ret_ty, func.exname, arg_str)
-
-# Implementation header, for use by the module itself
-def write_header(component):
-    header_path = os.path.join(outpath, basename + '_impl.h')
-    template_path = os.path.join(srcpath, 'c_header_template.h')
-    header = open(template_path).read()
-
-    # XXX: this is subtly wrong, but will be fixed by a later tool
-    # the key assumption is that we're the only module, and can thus uniquely
-    # derive a header for a C++ module.
-
-    import_decls = ''
-    for imp, funcs in component.imports.iteritems():
-        for func in funcs:
-            attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.exname)
-            import_decls += attr + ' ' + it_to_cpp_func(func)
-    header = header.replace('/**IMPORT_DECLS**/', import_decls)
-
-    export_decls = ''
-    for func in component.exports:
-        # XXX: This should not need to have a 1:1 correspondence with the
-        # component's exports, but for convenience it does for the moment
-        attr = '__attribute__((export_name("{}")))'.format(func.exname)
-        export_decls += attr + ' ' + it_to_cpp_func(func)
-    header = header.replace('/**EXPORT_DECLS**/', export_decls)
-
-    open(header_path, 'w').write(header)
-    print('Wrote header', header_path)
 
 # NodeJS wrapper module
 num_locals = 0

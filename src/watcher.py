@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 
 def run(cmd):
     now = time.asctime()
@@ -37,7 +38,8 @@ while True:
             sys.stdout.flush()
             run(cmd)
         except Exception as e:
-            print 'failed:', e
+            trace = traceback.format_exc(e)
+            print trace
         # re-cache times for any build artifacts
         update_times()
     sys.stdout.flush()
