@@ -11,7 +11,8 @@ import traceback
 def run(cmd):
     now = time.asctime()
     print('[{}] : running {}'.format(now, cmd))
-    subprocess.check_call(cmd, stderr=subprocess.PIPE)
+    pid = subprocess.Popen(cmd)
+    return pid.communicate()
 
 watchpath = sys.argv[1]
 assert(sys.argv[2] == '--')

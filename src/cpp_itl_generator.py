@@ -2,22 +2,32 @@
 
 # Generates an ITL description and a vanilla .cpp from an annotated .cpp file
 
+import argparse
 import os
 import sys
 import traceback
 
 def main():
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('cpp_in')
+    arg_parser.add_argument('--cpp-out', dest='cpp_out', default=None)
+    arg_parser.add_argument('--itl-out', dest='itl_out', default=None)
+    args = arg_parser.parse_args(sys.argv[1:])
+
     srcpath = os.path.dirname(__file__)
     outpath = 'out'
     ensure_path(outpath)
 
     # Paths
-    cpp_in = sys.argv[1]
+    cpp_in = args.cpp_in
     basename, _ = os.path.splitext(cpp_in)
-    # h_out = os.path.join(outpath, basename + '_impl.h')
     h_out = outpath + '/' + basename + '_impl.h'
-    cpp_out = os.path.join(outpath, cpp_in)
-    itl_out = os.path.join(outpath, basename + '.itl')
+    cpp_out = args.cpp_out
+    if not cpp_out:
+        cpp_out = os.path.join(outpath, cpp_in)
+    itl_out = args.itl_out
+    if not itl_out:
+        itl_out = os.path.join(outpath, basename + '.itl')
     wasm_out = outpath + '/' + basename + '.wasm'
 
     # read + parse
@@ -30,18 +40,7 @@ def main():
 
     #############################################
 
-    # Write output .cpp file
-    cpp_contents = (
-        contents[:start-len(start_str)] +
-        # Add an include to the generated header file
-        '#include "' + h_out + '"\n' +
-        contents[end+len(end_str):]
-    )
-    open(cpp_out, 'w').write(cpp_contents)
-
-    #############################################
-
-    # Write .h file
+    # Write compute import+export declarations
     template_path = os.path.join(srcpath, 'c_header_template.h')
     h_contents = open(template_path).read()
     def it_to_cpp_ty(ty):
@@ -68,7 +67,19 @@ def main():
         attr = '__attribute__((export_name("{}")))'.format(func.name)
         export_decls += attr + ' ' + it_to_cpp_func(func)
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
-    open(h_out, 'w').write(h_contents)
+    # open(h_out, 'w').write(h_contents)
+
+    #############################################
+
+    # Write output .cpp file
+    cpp_contents = (
+        contents[:start-len(start_str)] +
+        h_contents +
+        # Add an include to the generated header file
+        # '#include "' + h_out + '"\n' +
+        contents[end+len(end_str):]
+    )
+    open(cpp_out, 'w').write(cpp_contents)
 
     #############################################
 

@@ -1,5 +1,3 @@
-#pragma once
-
 // Imports
 /**IMPORT_DECLS**/
 
