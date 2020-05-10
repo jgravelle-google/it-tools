@@ -10,25 +10,31 @@ import traceback
 def main():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('cpp_in')
-    arg_parser.add_argument('--cpp-out', dest='cpp_out', default=None)
-    arg_parser.add_argument('--itl-out', dest='itl_out', default=None)
+    arg_parser.add_argument('--cpp', dest='cpp_out', default=None)
+    arg_parser.add_argument('--itl', dest='itl_out', default=None)
+    arg_parser.add_argument('--wasm', dest='wasm_out', default=None)
     args = arg_parser.parse_args(sys.argv[1:])
 
     srcpath = os.path.dirname(__file__)
-    outpath = 'out'
-    ensure_path(outpath)
 
     # Paths
     cpp_in = args.cpp_in
     basename, _ = os.path.splitext(cpp_in)
-    h_out = outpath + '/' + basename + '_impl.h'
+    outpath = 'out' # default path for output files
     cpp_out = args.cpp_out
     if not cpp_out:
         cpp_out = os.path.join(outpath, cpp_in)
     itl_out = args.itl_out
     if not itl_out:
         itl_out = os.path.join(outpath, basename + '.itl')
-    wasm_out = outpath + '/' + basename + '.wasm'
+    wasm_out = args.wasm_out
+    if not wasm_out:
+        # / instead of os.path.join because ITL expects / for paths
+        wasm_out = outpath + '/' + basename + '.wasm'
+
+    def write_file(filename, contents):
+        ensure_path_for(filename)
+        open(filename, 'w').write(contents)
 
     # read + parse
     contents = open(cpp_in).read()
@@ -47,6 +53,7 @@ def main():
         mapping = {
             'u1': 'bool',
             's32': 'int',
+            'f32': 'float',
             'string': 'const char*',
             'void': 'void',
         }
@@ -67,7 +74,6 @@ def main():
         attr = '__attribute__((export_name("{}")))'.format(func.name)
         export_decls += attr + ' ' + it_to_cpp_func(func)
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
-    # open(h_out, 'w').write(h_contents)
 
     #############################################
 
@@ -79,7 +85,7 @@ def main():
         # '#include "' + h_out + '"\n' +
         contents[end+len(end_str):]
     )
-    open(cpp_out, 'w').write(cpp_contents)
+    write_file(cpp_out, cpp_contents)
 
     #############################################
 
@@ -106,9 +112,10 @@ def main():
         itl_contents += ')\n'
 
     # Wasm module
+    as_types = ['u1', 's32', 'f32']
     def lift(ty, expr):
         # C++ -> IT
-        if ty in ['u1', 's32']:
+        if ty in as_types:
             return '(as {} {})'.format(ty, expr)
         elif ty == 'string':
             return '(call _it_cppToString {})'.format(expr)
@@ -116,7 +123,7 @@ def main():
             return expr
         assert False, 'unknown lifting type: ' + ty
     def lower(ty, expr):
-        if ty in ['u1', 's32']:
+        if ty in as_types:
             return '(as i32 {})'.format(expr)
         elif ty == 'string':
             return '(call _it_stringToCpp {})'.format(expr)
@@ -188,7 +195,7 @@ def main():
 
 '''
 
-    open(itl_out, 'w').write(itl_contents)
+    write_file(itl_out, itl_contents)
 
 class AST(object):
     def __init__(self, imports, exports):
@@ -313,6 +320,8 @@ def ensure_path(path):
         os.makedirs(path)
     except:
         pass
+def ensure_path_for(filepath):
+    ensure_path(os.path.dirname(filepath))
 
 if __name__ == '__main__':
     try:
