@@ -9,7 +9,7 @@ out:
 	mkdir -p out
 
 out/%.js: %.itl
-	python ../adapter.py $<
+	python ../../src/adapter.py $<
 
 out/%.wasm: %.cpp
 	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -std=c++11
