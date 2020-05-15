@@ -1,0 +1,6 @@
+(component fizz "out/fizz.itl")
+(component buzz "out/buzz.itl")
+(component fizzbuzz "out/fizzbuzz.itl"
+    ("fizz" fizz)
+    ("buzz" buzz)
+)
