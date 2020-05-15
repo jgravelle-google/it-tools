@@ -65,10 +65,12 @@ def write_js_module(component):
             func = component.all_funcs[func_name]
             if func.location[0] == 'import':
                 mod_name = func.location[1]
-                return 'imports["{}"]["{}"]({})'.format(mod_name, func_name, args)
+                ex_name = func.exname
+                return 'imports["{}"]["{}"]({})'.format(mod_name, ex_name, args)
             elif func.location[0] == 'module':
                 mod_name = func.location[1]
-                return '{}["{}"]({})'.format(mod_name, func_name, args)
+                ex_name = func.exname
+                return '{}["{}"]({})'.format(mod_name, ex_name, args)
             elif func.location[0] == 'component':
                 return '{}({})'.format(func_name, args)
             else:
@@ -149,7 +151,7 @@ def write_js_module(component):
     for mod in component.modules:
         name = mod.name
         path = mod.path
-        module_names += tab * 2 + 'let {};'.format(name)
+        module_names += tab * 2 + 'let {};\n'.format(name)
         load_modules += tab * 2 + '{} = await loadModule("{}", {{\n'.format(name, path)
         for imp, funcs in mod.imports.iteritems():
             load_modules += tab * 3 + imp + ': {\n'

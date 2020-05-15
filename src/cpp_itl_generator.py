@@ -181,16 +181,17 @@ def main():
 )
 (func _it_stringToCpp "" (param string) (result i32)
     ;; helper function to convert strings as a unary expression
-    (let (call malloc (+ (string-len (local 0)) 1)))
+    (let (string-len (local 0)))
+    (let (call malloc (+ (local 1) 1)))
     (string-to-mem wasm "memory"
         (local 0) ;; str
-        (local 1) ;; ptr
+        (local 2) ;; ptr
     )
     (call _it_writeStringTerm
-        (local 1)
-        (string-len (local 0))
+        (local 2) ;; ptr
+        (local 1) ;; len
     )
-    (local 1)
+    (local 2) ;; ptr
 )
 
 '''

@@ -3,61 +3,89 @@
     (func logInt "logInt" (param s32) (result ))
 )
 
-(module wasm "out/fizzbuzz.wasm"
+(module fizz "out/fizz.wasm"
+    (func isFizz "isFizz" (param i32) (result i32))
+    (func fizzStr_ "fizzStr" (param) (result i32))
+    (func fizz_strlen "_it_strlen" (param i32) (result i32))
+)
+
+(module buzz "out/buzz.wasm"
+    (func isBuzz "isBuzz" (param i32) (result i32))
+    (func buzzStr_ "buzzStr" (param) (result i32))
+    (func buzz_strlen "_it_strlen" (param i32) (result i32))
+)
+
+(func fizzStr "" (param) (result string)
+    (let (call fizzStr_))
+    (mem-to-string fizz "memory"
+        (local 0)
+        (call fizz_strlen (local 0))
+    )
+)
+(func buzzStr "" (param) (result string)
+    (let (call buzzStr_))
+    (mem-to-string buzz "memory"
+        (local 0)
+        (call buzz_strlen (local 0))
+    )
+)
+
+(module fizzbuzz "out/fizzbuzz.wasm"
+    (import "fizz"
+        (func _ "isFizz" (param s32) (result i32)
+            (as i32 (call isFizz (as s32 (local 0))))
+        )
+        (func _ "fizzStr" (param) (result i32)
+            (call fizzbuzz_stringToCpp (call fizzStr))
+        )
+    )
     (import "buzz"
-        (func _ "isBuzz" (param s32) (result u1)
+        (func _ "isBuzz" (param s32) (result i32)
             (as i32 (call isBuzz
-                (as s32 (local 0)))))
-        (func _ "buzzStr" (param ) (result string)
-            (call _it_stringToCpp (call buzzStr)))
+                (as s32 (local 0))))
+        )
+        (func _ "buzzStr" (param) (result i32)
+            (call fizzbuzz_stringToCpp (call buzzStr))
+        )
     )
     (import "console"
-        (func _ "log" (param string) (result )
-            (call log
-                (call _it_cppToString (local 0))))
-        (func _ "logInt" (param s32) (result )
-            (call logInt
-                (as s32 (local 0))))
+        (func _ "log" (param string) (result)
+            (call log (call fizzbuzz_cppToString (local 0)))
+        )
+        (func _ "logInt" (param s32) (result)
+            (call logInt (as s32 (local 0)))
+        )
     )
-    (import "fizz"
-        (func _ "isFizz" (param s32) (result u1)
-            (as i32 (call isFizz
-                (as s32 (local 0)))))
-        (func _ "fizzStr" (param ) (result string)
-            (call _it_stringToCpp (call fizzStr)))
-    )
-    (func fizzbuzz "fizzbuzz" (param i32) (result ))
+    (func fizzbuzz "fizzbuzz" (param i32) (result))
     (func malloc "malloc" (param i32) (result i32))
     (func _it_strlen "_it_strlen" (param i32) (result i32))
     (func _it_writeStringTerm "_it_writeStringTerm" (param i32 i32) (result ))
 )
 
 (export
-    (func _ "fizzbuzz" (param s32) (result )
-        (call fizzbuzz
-            (as i32 (local 0)))
+    (func _ "fizzbuzz" (param s32) (result)
+        (call fizzbuzz (as i32 (local 0)))
     )
 )
 
-
-(func _it_cppToString "" (param i32) (result string)
+(func fizzbuzz_cppToString "" (param i32) (result string)
     ;; helper function to convert strings as a unary expression
-    (mem-to-string wasm "memory"
+    (mem-to-string fizzbuzz "memory"
         (local 0)
         (call _it_strlen (local 0))
     )
 )
-(func _it_stringToCpp "" (param string) (result i32)
+(func fizzbuzz_stringToCpp "" (param string) (result i32)
     ;; helper function to convert strings as a unary expression
-    (let (call malloc (+ (string-len (local 0)) 1)))
-    (string-to-mem wasm "memory"
+    (let (string-len (local 0)))
+    (let (call malloc (+ (local 1) 1)))
+    (string-to-mem fizzbuzz "memory"
         (local 0) ;; str
-        (local 1) ;; ptr
+        (local 2) ;; ptr
     )
     (call _it_writeStringTerm
-        (local 1)
-        (string-len (local 0))
+        (local 2) ;; ptr
+        (local 1) ;; len
     )
-    (local 1)
+    (local 2) ;; ptr
 )
-
