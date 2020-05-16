@@ -4,6 +4,7 @@
 
 import sys
 
+# TODO: extract to standalone AST python module
 class Component(object):
     def __init__(self):
         self.imports = {} # imports to the component
@@ -22,17 +23,12 @@ def unquote(name):
     return name[1:-1]
 
 class Func(object):
-    def __init__(self, sexpr, location):
-        assert(sexpr[0] == 'func')
-        self.name = sexpr[1]
-        # external name
-        self.exname = unquote(sexpr[2])
-        assert(sexpr[3][0] == 'param')
-        self.params = sexpr[3][1:]
-        assert(sexpr[4][0] == 'result')
-        self.results = sexpr[4][1:]
-        self.body = sexpr[5:]
-
+    def __init__(self, name, exname, params, results, body, location):
+        self.name = name
+        self.exname = exname # external name
+        self.params = params
+        self.results = results
+        self.body = body
         self.location = location
 
 class Module(object):
@@ -85,14 +81,26 @@ def parse(body):
     sexprs = SexprParser(body).parse()
     component = Component()
 
+    def parse_func(sexpr, location):
+        assert(sexpr[0] == 'func')
+        name = sexpr[1]
+        # external name
+        exname = unquote(sexpr[2])
+        assert(sexpr[3][0] == 'param')
+        params = sexpr[3][1:]
+        assert(sexpr[4][0] == 'result')
+        results = sexpr[4][1:]
+        body = sexpr[5:]
+        return Func(name, exname, params, results, body, location)
+
     def parse_module_elem(mod, sexpr):
         if sexpr[0] == 'func':
-            func = Func(sexpr, ['module', mod.name])
+            func = parse_func(sexpr, ['module', mod.name])
             mod.funcs.append(func)
             component.add_func(func)
         elif sexpr[0] == 'import':
             im_name = unquote(sexpr[1])
-            funcs = [Func(e, None) for e in sexpr[2:]]
+            funcs = [parse_func(e, None) for e in sexpr[2:]]
             mod.imports[im_name] = funcs
             for func in funcs:
                 component.add_func(func)
@@ -107,18 +115,18 @@ def parse(body):
             component.modules.append(mod)
         elif group[0] == 'export':
             for elem in group[1:]:
-                func = Func(elem, None)
+                func = parse_func(elem, None)
                 component.exports.append(func)
                 component.add_func(func)
         elif group[0] == 'import':
             name = unquote(group[1])
-            funcs = [Func(e, ['import', name]) for e in group[2:]]
+            funcs = [parse_func(e, ['import', name]) for e in group[2:]]
             component.imports[name] = funcs
             for func in funcs:
                 component.add_func(func)
         elif group[0] == 'func':
             # Component-only functions
-            func = Func(group, ['component'])
+            func = parse_func(group, ['component'])
             component.funcs.append(func)
             component.add_func(func)
 

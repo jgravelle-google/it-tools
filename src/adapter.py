@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 # Generates a JS adapter module from an IDL file
-# TODO: split JS and .h generation to two scripts
 
 import os
 import sys

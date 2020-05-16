@@ -90,6 +90,7 @@ def main():
     #############################################
 
     # Write .itl file
+    # TODO: extract this AST -> ITL logic to an ItlWriter class
     tab = '    '
     itl_contents = ''
 

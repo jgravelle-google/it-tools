@@ -27,3 +27,9 @@ module with adapter functions.
 
 The purpose of this script is to automate the bulk of writing ITL and C++
 annotations by hand.
+
+## itl_iwasm_generator.py
+
+Generates an .iwasm module from an .itl file.
+
+IWasm is an binary format that describes an IT module, aka a component.
