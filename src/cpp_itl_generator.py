@@ -52,8 +52,14 @@ def main():
     def it_to_cpp_ty(ty):
         mapping = {
             'u1': 'bool',
+            's8': 'char',
+            'u8': 'unsigned char',
+            's16': 'short',
+            'u16': 'unsigned short',
             's32': 'int',
+            'u32': 'unsigned int',
             'f32': 'float',
+            'f64': 'double',
             'string': 'const char*',
             'void': 'void',
         }
@@ -113,10 +119,12 @@ def main():
         itl_contents += ')\n'
 
     # Wasm module
-    as_types = ['u1', 's32', 'f32']
+    integer_types = ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']
+    float_types = ['f32', 'f64']
+    numeric_types = integer_types + float_types
     def lift(ty, expr):
         # C++ -> IT
-        if ty in as_types:
+        if ty in numeric_types:
             return '(as {} {})'.format(ty, expr)
         elif ty == 'string':
             return '(call _it_cppToString {})'.format(expr)
@@ -124,8 +132,11 @@ def main():
             return expr
         assert False, 'unknown lifting type: ' + ty
     def lower(ty, expr):
-        if ty in as_types:
+        if ty in integer_types:
             return '(as i32 {})'.format(expr)
+        elif ty in float_types:
+            # currently all float types happen to match core wasm
+            return '(as {} {})'.format(ty, expr)
         elif ty == 'string':
             return '(call _it_stringToCpp {})'.format(expr)
         elif ty == 'void':

@@ -28,13 +28,6 @@ def ensure_path(path):
     except:
         pass
 
-def it_to_cpp_ty(ty):
-    TYPES = {
-        'u1': 'bool',
-        's32': 'int',
-        'string': 'const char*',
-    }
-    return TYPES[ty]
 def it_to_cpp_func(func):
     ret_ty = it_to_cpp_ty(func.results[0]) if func.results else 'void'
     arg_tys = [it_to_cpp_ty(param) for param in func.params]
