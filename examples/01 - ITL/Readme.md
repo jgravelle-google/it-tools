@@ -1,4 +1,4 @@
-# 1 - ITL IDL
+# Example #1 - ITL IDL
 
 This is a proof-of-concept for the ITL file format. ITL stands for "Interface
 Types IDL".

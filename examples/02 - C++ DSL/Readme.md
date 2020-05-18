@@ -1,4 +1,4 @@
-# 2 - C++ DSL
+# Example #2 - C++ DSL
 
 This demonstrates generating ITL from a C++-aware tool.
 

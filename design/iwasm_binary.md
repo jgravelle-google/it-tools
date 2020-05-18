@@ -1,5 +1,10 @@
 # .iwasm binary format
 
+## IWasm?
+
+IWasm, short for Interface Types WebAssembly Module. A strawman binary format
+that describes an IT component.
+
 ## Grammar
 
 Notation notes:
@@ -11,7 +16,10 @@ Notation notes:
 * `enum { (A: B)* }` : the first matching B (labeled by A's)
 
 ```
-component <- vec(import*) / vec(export*) / vec(module*) / vec(func*)
+iwasm <- header / vec(import*) / vec(export*) / vec(module*) / vec(func*)
+header <- magic / version
+magic <- 0x00 / 'a' / 's' / 'm'
+version <- 0x01 / 0x00 / 0x01 / 0x00
 import <- mod_name / name / func
 export <- name / func
 module <- [WebAssembly module, binary format]
@@ -44,3 +52,11 @@ type <- enum {
 }
 struct_field <- name / type
 ```
+
+## Notes
+
+* Normal wasm modules are embedded in an iwasm file inline
+* The 8 bytes are nearly identical to a regular wasm module
+    * The version field has another bit set. This changes the meaning from 4
+      bytes of version, to 2 bytes of version and 2 bytes of module kind, 0 for
+      standard wasm, 1 for IT
