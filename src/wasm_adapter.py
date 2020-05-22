@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Generates a JS adapter module from an IDL file
+# Generates a wasm adapter module from an IDL file
 
 import os
 import sys
@@ -20,7 +20,7 @@ def main():
 
     ensure_path(outpath)
 
-    write_js_module(component)
+    write_wasm_module(component)
 
 def ensure_path(path):
     try:
@@ -28,10 +28,10 @@ def ensure_path(path):
     except:
         pass
 
-# NodeJS wrapper module
 num_locals = 0
-def write_js_module(component):
-    global num_locals # thanks python
+def write_wasm_module(component):
+    # TODO: emit real wasm, not wat
+    global num_locals
     def escape(s):
         return s.replace('\\', '/')
     def expr(sexpr):
@@ -43,31 +43,22 @@ def write_js_module(component):
             return expr(sexpr[2])
         elif head == 'local':
             assert(len(sexpr) == 2)
-            return 'x' + sexpr[1]
+            return '(local.get {})'.format(sexpr[1])
         elif head == 'call':
             assert(len(sexpr) >= 2)
             func_name = sexpr[1]
-            args = ', '.join([expr(x) for x in sexpr[2:]])
+            args = ' '.join([expr(x) for x in sexpr[2:]])
             func = component.all_funcs[func_name]
-            if func.location[0] == 'import':
-                mod_name = func.location[1]
-                ex_name = func.exname
-                return 'imports["{}"]["{}"]({})'.format(mod_name, ex_name, args)
-            elif func.location[0] == 'module':
-                mod_name = func.location[1]
-                ex_name = func.exname
-                return '{}["{}"]({})'.format(mod_name, ex_name, args)
-            elif func.location[0] == 'component':
-                return '{}({})'.format(func_name, args)
-            else:
-                assert False, 'Unknown location for func: ' + str(func.location)
+            return '(call ${} {})'.format(func_name, args)
         elif head == 'let':
+            assert False, 'unimplemented `let`'
             assert(len(sexpr) == 2)
             local = 'x' + str(num_locals)
             num_locals += 1
             ex = expr(sexpr[1])
             return 'let {} = {}'.format(local, ex)
         elif head == 'mem-to-string':
+            assert False, 'unimplemented `mem-to-string`'
             assert(len(sexpr) == 5)
             mod = sexpr[1]
             mem = sexpr[2]
@@ -75,6 +66,7 @@ def write_js_module(component):
             length = expr(sexpr[4])
             return 'memToString({}[{}], {}, {})'.format(mod, mem, ptr, length)
         elif head == 'string-to-mem':
+            assert False, 'unimplemented `string-to-mem`'
             assert(len(sexpr) == 5)
             mod = sexpr[1]
             mem = sexpr[2]
@@ -82,6 +74,7 @@ def write_js_module(component):
             ptr = expr(sexpr[4])
             return 'stringToMem({}[{}], {}, {})'.format(mod, mem, string, ptr)
         elif head == 'string-len':
+            assert False, 'unimplemented `string-len`'
             assert(len(sexpr) == 2)
             string = expr(sexpr[1])
             return '{}.length'.format(string)
@@ -89,11 +82,11 @@ def write_js_module(component):
             assert(len(sexpr) == 3)
             lhs = expr(sexpr[1])
             rhs = expr(sexpr[2])
-            return '({} + {})'.format(lhs, rhs)
+            return '(i32.add {} {})'.format(lhs, rhs)
         else:
             try:
                 n = int(head)
-                return str(n)
+                return '(i32.const {})'.format(n)
             except:
                 pass
         assert False, 'Unknown expr: {}'.format(sexpr)

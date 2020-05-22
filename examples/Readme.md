@@ -23,3 +23,21 @@ which can then be translated into JS.
 ### 03- Static Linking (Wasm)
 
 Demonstrates loading multiple wasm modules from one IT component.
+
+# Planned
+
+These samples are not.
+
+### Self-hosting
+
+IT linking implemented in Wasm. May depend on multiple memories.
+
+### Static Component Linking
+
+Loading multiple sub-components from one IT component.
+
+### Structs
+
+### Arrays
+
+### Arrays of Strings
