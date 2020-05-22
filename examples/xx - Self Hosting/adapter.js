@@ -51,24 +51,24 @@ module.exports = {
             return x2;
         };
 
-        let pre = await loadModule('out/pre.wasm', {
-            foo: { bar: (x, y) => x + y },
-        });
-        console.log('DOIN IT', pre.baz(4));
+        let itRuntime = {
+            "string-len": (x) => x,
+            "mem-to-string": (memID, ptr, len) => 0,
+            "string-to-mem": (memID, str, ptr) => {},
+            table: new WebAssembly.Table({ element: "anyfunc", initial: 3 }),
+        };
 
         fizz = await loadModule("out/fizz.wasm", {
         });
         buzz = await loadModule("out/buzz.wasm", {
         });
+
+        let pre = await loadModule('out/pre.wasm', {
+            buzz,
+            _it: itRuntime,
+        });
         fizzbuzz = await loadModule("out/fizzbuzz.wasm", {
-            buzz: {
-                "isBuzz": function(x0) {
-                    return buzz["isBuzz"](x0);
-                },
-                "buzzStr": function() {
-                    return fizzbuzz_stringToCpp(buzzStr());
-                },
-            },
+            buzz: pre,
             console: {
                 "log": function(x0) {
                     imports["console"]["log"](fizzbuzz_cppToString(x0));
@@ -86,6 +86,9 @@ module.exports = {
                 },
             },
         });
+        console.log(fizzbuzz);
+        itRuntime.table.set(1, fizzbuzz.malloc);
+        itRuntime.table.set(2, fizzbuzz._it_writeStringTerm);
 
         let wrappedExports = {
             "fizzbuzz": function(x0) {

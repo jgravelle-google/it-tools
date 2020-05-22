@@ -13,6 +13,7 @@ out/%.cpp: %.cpp
 
 out/%.wasm: out/%.cpp
 	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -Iout -I. -std=c++11
+	wasm-decompile $@ -o out/$*.wade
 
 out/%.wasm: %.wat
-	wat2wasm $< -o $@
+	wat2wasm $< -o $@ --debug-names
