@@ -10,7 +10,11 @@ implemented in terms of function calls (and JS imports) in the interim.
 
 ### Step 1: Implement manually
 
-Handwrite the JS and wat needed to implement this
+Handwritten JS functions that load a single wasm module and wrap it with another.
+Each wasm module has an associated adapter module build from .wat assembly.
+
+Each JS module has its own copy of the IT-runtime JS module, which adapts any
+unrepresentable IT types, such as strings, arrays, and records.
 
 ### Step 2: Automate
 

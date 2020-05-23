@@ -1,5 +1,5 @@
 run: build
-	node shell.js
+	node --experimental-wasm-anyref shell.js
 .PHONY: run
 
 build: out out/fizzbuzz.wasm out/fizz.wasm out/buzz.wasm out/pre_fizzbuzz.wasm

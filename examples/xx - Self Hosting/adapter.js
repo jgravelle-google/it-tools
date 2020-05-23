@@ -36,10 +36,6 @@ module.exports = {
             let x0 = fizz["fizzStr"]();
             return memToString(fizz["memory"], x0, fizz["_it_strlen"](x0));
         };
-        function buzzStr() {
-            let x0 = buzz["buzzStr"]();
-            return memToString(buzz["memory"], x0, buzz["_it_strlen"](x0));
-        };
         function fizzbuzz_cppToString(x0) {
             return memToString(fizzbuzz["memory"], x0, fizzbuzz["_it_strlen"](x0));
         };
@@ -58,13 +54,8 @@ module.exports = {
             table: new WebAssembly.Table({ element: "anyfunc", initial: 3 }),
         };
 
-        fizz = await loadModule("out/fizz.wasm", {
-        });
-        buzz = await loadModule("out/buzz.wasm", {
-        });
-
         let pre_fizzbuzz = await loadModule('out/pre_fizzbuzz.wasm', {
-            buzz,
+            buzz: imports,
             _it_runtime,
         });
         fizzbuzz = await loadModule("out/fizzbuzz.wasm", {
@@ -87,8 +78,8 @@ module.exports = {
             },
         });
         console.log(fizzbuzz);
-        itRuntime.table.set(1, fizzbuzz.malloc);
-        itRuntime.table.set(2, fizzbuzz._it_writeStringTerm);
+        it_runtime.table.set(1, fizzbuzz.malloc);
+        it_runtime.table.set(2, fizzbuzz._it_writeStringTerm);
 
         let wrappedExports = {
             "fizzbuzz": function(x0) {

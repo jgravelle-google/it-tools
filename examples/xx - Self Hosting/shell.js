@@ -1,7 +1,10 @@
 async function run() {
     try {
         // Load modules
-        let fizzbuzz = await require('./adapter.js').instantiate({
+        let fizz = await require('./fizz.js').instantiate({});
+        let buzz = await require('./buzz.js').instantiate({});
+        let fizzbuzz = await require('./fizzbuzz.js').instantiate({
+            fizz, buzz,
             console: {
                 log: console.log,
                 logInt: console.log,
