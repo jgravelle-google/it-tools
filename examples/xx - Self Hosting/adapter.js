@@ -51,7 +51,7 @@ module.exports = {
             return x2;
         };
 
-        let itRuntime = {
+        let _it_runtime = {
             "string-len": (x) => x,
             "mem-to-string": (memID, ptr, len) => 0,
             "string-to-mem": (memID, str, ptr) => {},
@@ -63,12 +63,12 @@ module.exports = {
         buzz = await loadModule("out/buzz.wasm", {
         });
 
-        let pre = await loadModule('out/pre.wasm', {
+        let pre_fizzbuzz = await loadModule('out/pre_fizzbuzz.wasm', {
             buzz,
-            _it: itRuntime,
+            _it_runtime,
         });
         fizzbuzz = await loadModule("out/fizzbuzz.wasm", {
-            buzz: pre,
+            buzz: pre_fizzbuzz,
             console: {
                 "log": function(x0) {
                     imports["console"]["log"](fizzbuzz_cppToString(x0));

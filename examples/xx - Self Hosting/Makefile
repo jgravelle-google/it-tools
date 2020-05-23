@@ -2,7 +2,7 @@ run: build
 	node shell.js
 .PHONY: run
 
-build: out out/fizzbuzz.wasm out/fizz.wasm out/buzz.wasm out/pre.wasm
+build: out out/fizzbuzz.wasm out/fizz.wasm out/buzz.wasm out/pre_fizzbuzz.wasm
 
 out:
 	mkdir -p out
