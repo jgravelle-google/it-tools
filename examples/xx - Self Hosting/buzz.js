@@ -12,45 +12,40 @@ module.exports = {
         }
 
         // Nontrivial adapter instructions
-        function memToString(memory, ptr, len) {
-            let u8 = new Uint8Array(memory.buffer);
-            let str = '';
-            for (var i = 0; i < len; ++i) {
-                str += String.fromCharCode(u8[ptr + i]);
-            }
-            return str;
-        }
-        function stringToMem(memory, str, ptr) {
-            let u8 = new Uint8Array(memory.buffer);
-            let len = str.length;
-            for (var i = 0; i < len; ++i) {
-                u8[ptr + i] = str.charCodeAt(i);
-            }
-            return len;
-        }
-
-        function _it_cppToString(x0) {
-            return memToString(wasm["memory"], x0, wasm["_it_strlen"](x0));
+        let memory;
+        let _it_runtime = {
+            "string-len": (x) => x.length,
+            "mem-to-string": (ptr, len) => {
+                let u8 = new Uint8Array(memory.buffer);
+                let str = '';
+                for (var i = 0; i < len; ++i) {
+                    str += String.fromCharCode(u8[ptr + i]);
+                }
+                return str;
+            },
+            "string-to-mem": (str, ptr) => {
+                let u8 = new Uint8Array(memory.buffer);
+                let len = str.length;
+                for (var i = 0; i < len; ++i) {
+                    u8[ptr + i] = str.charCodeAt(i);
+                }
+                return len;
+            },
         };
-        function _it_stringToCpp(x0) {
-            let x1 = wasm["malloc"]((x0.length + 1));
-            stringToMem(wasm["memory"], x0, x1);
-            wasm["_it_writeStringTerm"](x1, x0.length);
-            return x1;
-        };
+        let pre_wasm = await loadModule('out/pre_buzz.wasm', {
+            _it_runtime,
+        });
 
         wasm = await loadModule("out/buzz.wasm", {
         });
 
-        let wrappedExports = {
-            "isBuzz": function(x0) {
-                return wasm["isBuzz"](x0);
-            },
-            "buzzStr": function() {
-                return _it_cppToString(wasm["buzzStr"]());
-            },
-        };
+        memory = wasm.memory;
+        pre_wasm.table.set(0, wasm.malloc);
+        pre_wasm.table.set(1, wasm._it_writeStringTerm);
+        pre_wasm.table.set(2, wasm._it_strlen);
+        pre_wasm.table.set(3, wasm.isBuzz);
+        pre_wasm.table.set(4, wasm.buzzStr);
 
-        return wrappedExports;
+        return pre_wasm;
     },
 };

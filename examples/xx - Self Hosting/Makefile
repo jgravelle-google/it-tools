@@ -2,7 +2,8 @@ run: build
 	node --experimental-wasm-anyref shell.js
 .PHONY: run
 
-build: out out/fizzbuzz.wasm out/fizz.wasm out/buzz.wasm out/pre_fizzbuzz.wasm
+build: out out/fizzbuzz.wasm out/fizz.wasm out/buzz.wasm \
+out/pre_fizzbuzz.wasm out/pre_fizz.wasm out/pre_buzz.wasm
 
 out:
 	mkdir -p out

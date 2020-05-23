@@ -13,27 +13,24 @@ module.exports = {
 
         // Nontrivial adapter instructions
         let memory;
-        function memToString(ptr, len) {
-            let u8 = new Uint8Array(memory.buffer);
-            let str = '';
-            for (var i = 0; i < len; ++i) {
-                str += String.fromCharCode(u8[ptr + i]);
-            }
-            return str;
-        }
-        function stringToMem(str, ptr) {
-            let u8 = new Uint8Array(memory.buffer);
-            let len = str.length;
-            for (var i = 0; i < len; ++i) {
-                u8[ptr + i] = str.charCodeAt(i);
-            }
-            return len;
-        }
-
         let _it_runtime = {
             "string-len": (x) => x.length,
-            "mem-to-string": memToString,
-            "string-to-mem": stringToMem,
+            "mem-to-string": (ptr, len) => {
+                let u8 = new Uint8Array(memory.buffer);
+                let str = '';
+                for (var i = 0; i < len; ++i) {
+                    str += String.fromCharCode(u8[ptr + i]);
+                }
+                return str;
+            },
+            "string-to-mem": (str, ptr) => {
+                let u8 = new Uint8Array(memory.buffer);
+                let len = str.length;
+                for (var i = 0; i < len; ++i) {
+                    u8[ptr + i] = str.charCodeAt(i);
+                }
+                return len;
+            },
         };
         let pre_wasm = await loadModule('out/pre_fizzbuzz.wasm', {
             fizz: imports.fizz,
