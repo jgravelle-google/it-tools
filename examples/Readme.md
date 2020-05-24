@@ -20,17 +20,20 @@ Introduces the ITL file format, a low-level IDL that targets IT.
 Introduces a higher-level DSL for generating bindings for C++. Compiles to ITL,
 which can then be translated into JS.
 
-### 03- Static Linking (Wasm)
+### 03 - Static Linking (Wasm)
 
 Demonstrates loading multiple wasm modules from one IT component.
 
+### 04 - Self-hosting (manual)
+
+IT adapters implemented in handwritten wasm, as a proof of concept.
+
 # Planned
 
-These samples are not.
+These samples are not. They are notes for where we're going in the near future,
+to help clarify the bigger overall picture.
 
-### Self-hosting
-
-IT linking implemented in Wasm. May depend on multiple memories.
+### Self-hosting (generated)
 
 ### Static Component Linking
 
