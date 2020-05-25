@@ -29,13 +29,14 @@ def ensure_path(path):
         pass
 
 num_locals = 0
+extra_locals = []
 def write_wasm_module(component):
     # TODO: emit real wasm, not wat
-    global num_locals
+    global num_locals, extra_locals
     def escape(s):
         return s.replace('\\', '/')
     def expr(sexpr):
-        global num_locals
+        global num_locals, extra_locals
         assert(len(sexpr) > 0)
         head = sexpr[0]
         if head == 'as':
@@ -51,33 +52,30 @@ def write_wasm_module(component):
             func = component.all_funcs[func_name]
             return '(call ${} {})'.format(func_name, args)
         elif head == 'let':
-            assert False, 'unimplemented `let`'
             assert(len(sexpr) == 2)
-            local = 'x' + str(num_locals)
+            local = num_locals
             num_locals += 1
+            extra_locals.append('i32') # TODO: also handle strings?
             ex = expr(sexpr[1])
-            return 'let {} = {}'.format(local, ex)
+            return '(local.set {} {})'.format(local, ex)
         elif head == 'mem-to-string':
-            assert False, 'unimplemented `mem-to-string`'
             assert(len(sexpr) == 5)
             mod = sexpr[1]
             mem = sexpr[2]
             ptr = expr(sexpr[3])
             length = expr(sexpr[4])
-            return 'memToString({}[{}], {}, {})'.format(mod, mem, ptr, length)
+            return '(call $_it_mem_to_string {} {})'.format(ptr, length)
         elif head == 'string-to-mem':
-            assert False, 'unimplemented `string-to-mem`'
             assert(len(sexpr) == 5)
             mod = sexpr[1]
             mem = sexpr[2]
             string = expr(sexpr[3])
             ptr = expr(sexpr[4])
-            return 'stringToMem({}[{}], {}, {})'.format(mod, mem, string, ptr)
+            return '(call $_it_string_to_mem'.format(string, ptr)
         elif head == 'string-len':
-            assert False, 'unimplemented `string-len`'
             assert(len(sexpr) == 2)
             string = expr(sexpr[1])
-            return '{}.length'.format(string)
+            return '(call $_it_string_len {})'.format(string)
         elif head == '+':
             assert(len(sexpr) == 3)
             lhs = expr(sexpr[1])
