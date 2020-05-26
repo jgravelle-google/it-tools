@@ -34,69 +34,7 @@ def write_js_module(component):
     global num_locals # thanks python
     def escape(s):
         return s.replace('\\', '/')
-    def expr(sexpr):
-        global num_locals
-        assert(len(sexpr) > 0)
-        head = sexpr[0]
-        if head == 'as':
-            assert(len(sexpr) == 3)
-            return expr(sexpr[2])
-        elif head == 'local':
-            assert(len(sexpr) == 2)
-            return 'x' + sexpr[1]
-        elif head == 'call':
-            assert(len(sexpr) >= 2)
-            func_name = sexpr[1]
-            args = ', '.join([expr(x) for x in sexpr[2:]])
-            func = component.all_funcs[func_name]
-            if func.location[0] == 'import':
-                mod_name = func.location[1]
-                ex_name = func.exname
-                return 'imports["{}"]["{}"]({})'.format(mod_name, ex_name, args)
-            elif func.location[0] == 'module':
-                mod_name = func.location[1]
-                ex_name = func.exname
-                return '{}["{}"]({})'.format(mod_name, ex_name, args)
-            elif func.location[0] == 'component':
-                return '{}({})'.format(func_name, args)
-            else:
-                assert False, 'Unknown location for func: ' + str(func.location)
-        elif head == 'let':
-            assert(len(sexpr) == 2)
-            local = 'x' + str(num_locals)
-            num_locals += 1
-            ex = expr(sexpr[1])
-            return 'let {} = {}'.format(local, ex)
-        elif head == 'mem-to-string':
-            assert(len(sexpr) == 5)
-            mod = sexpr[1]
-            mem = sexpr[2]
-            ptr = expr(sexpr[3])
-            length = expr(sexpr[4])
-            return 'memToString({}[{}], {}, {})'.format(mod, mem, ptr, length)
-        elif head == 'string-to-mem':
-            assert(len(sexpr) == 5)
-            mod = sexpr[1]
-            mem = sexpr[2]
-            string = expr(sexpr[3])
-            ptr = expr(sexpr[4])
-            return 'stringToMem({}[{}], {}, {})'.format(mod, mem, string, ptr)
-        elif head == 'string-len':
-            assert(len(sexpr) == 2)
-            string = expr(sexpr[1])
-            return '{}.length'.format(string)
-        elif head == '+':
-            assert(len(sexpr) == 3)
-            lhs = expr(sexpr[1])
-            rhs = expr(sexpr[2])
-            return '({} + {})'.format(lhs, rhs)
-        else:
-            try:
-                n = int(head)
-                return str(n)
-            except:
-                pass
-        assert False, 'Unknown expr: {}'.format(sexpr)
+
     def function(func, n_indent, is_internal=False):
         global num_locals
         ret = ''
@@ -111,9 +49,9 @@ def write_js_module(component):
             sexpr = func.body[i]
             ret += tab * (n_indent + 1)
             if func.results and i == len(func.body) - 1:
-                ret += 'return ' + expr(sexpr)
+                ret += 'return ' + sexpr.as_js()
             else:
-                ret += expr(sexpr)
+                ret += sexpr.as_js()
             ret += ';\n'
         if is_internal:
             ret += tab * n_indent + '};\n'

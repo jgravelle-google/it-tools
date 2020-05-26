@@ -6,6 +6,7 @@ import os
 import sys
 import traceback
 
+from itl_ast import *
 import itl_parser
 
 outpath = 'out'
@@ -29,6 +30,7 @@ def ensure_path(path):
         pass
 
 num_locals = 0
+# extra_locals tracks the new locals allocated by `let` stmts
 extra_locals = []
 def write_wasm_module(component):
     # TODO: emit real wasm, not wat
@@ -89,7 +91,7 @@ def write_wasm_module(component):
                 pass
         assert False, 'Unknown expr: {}'.format(sexpr)
     def function(func, n_indent, is_internal=False):
-        global num_locals
+        global num_locals, extra_locals
         ret = ''
         params = ', '.join(['x' + str(i) for i in range(len(func.params))])
         if is_internal:
@@ -98,6 +100,7 @@ def write_wasm_module(component):
             decl = '"{}": function'.format(func.exname)
         ret += tab * n_indent + '{}({}) {{\n'.format(decl, params)
         num_locals = len(func.params)
+        extra_locals = []
         for i in range(len(func.body)):
             sexpr = func.body[i]
             ret += tab * (n_indent + 1)

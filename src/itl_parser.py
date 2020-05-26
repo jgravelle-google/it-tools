@@ -4,39 +4,7 @@
 
 import sys
 
-# TODO: extract to standalone AST python module
-class Component(object):
-    def __init__(self):
-        self.imports = {} # imports to the component
-        self.exports = [] # exports from the component
-        self.modules = [] # modules wrapped by the component
-        self.funcs = [] # component-local functions
-        
-        # lookup table for all functions by name
-        self.all_funcs = {}
-
-    def add_func(self, func):
-        self.all_funcs[func.name] = func
-
-def unquote(name):
-    assert(name[0] == '"' and name[-1] == '"')
-    return name[1:-1]
-
-class Func(object):
-    def __init__(self, name, exname, params, results, body, location):
-        self.name = name
-        self.exname = exname # external name
-        self.params = params
-        self.results = results
-        self.body = body
-        self.location = location
-
-class Module(object):
-    def __init__(self, name, path):
-        self.name = name
-        self.path = path
-        self.funcs = []
-        self.imports = {}
+from itl_ast import *
 
 class SexprParser(object):
     def __init__(self, body):
@@ -77,11 +45,72 @@ class SexprParser(object):
             i += 1
         return self.pop()
 
+def unquote(name):
+    assert(name[0] == '"' and name[-1] == '"')
+    return name[1:-1]
+
+num_locals = 0
+# extra_locals tracks the new locals allocated by `let` stmts
+extra_locals = []
 def parse(body):
     sexprs = SexprParser(body).parse()
     component = Component()
 
+    def parse_expr(sexpr):
+        global num_locals, extra_locals
+        assert(len(sexpr) > 0)
+        head = sexpr[0]
+        if head == 'as':
+            assert(len(sexpr) == 3)
+            ty = sexpr[1]
+            ex = parse_expr(sexpr[2])
+            return AsExpr(ty, ex)
+        elif head == 'local':
+            assert(len(sexpr) == 2)
+            return LocalExpr(int(sexpr[1]))
+        elif head == 'call':
+            assert(len(sexpr) >= 2)
+            name = sexpr[1]
+            args = [parse_expr(x) for x in sexpr[2:]]
+            return CallExpr(name, args)
+        elif head == 'let':
+            assert(len(sexpr) == 2)
+            idx = num_locals
+            num_locals += 1
+            ex = parse_expr(sexpr[1])
+            return LetExpr(idx, ex)
+        elif head == 'mem-to-string':
+            assert(len(sexpr) == 5)
+            mod = sexpr[1]
+            mem = sexpr[2]
+            ptr = parse_expr(sexpr[3])
+            length = parse_expr(sexpr[4])
+            return MemToStringExpr(mod, mem, ptr, length)
+        elif head == 'string-to-mem':
+            assert(len(sexpr) == 5)
+            mod = sexpr[1]
+            mem = sexpr[2]
+            string = parse_expr(sexpr[3])
+            ptr = parse_expr(sexpr[4])
+            return StringToMemExpr(mod, mem, string, ptr)
+        elif head == 'string-len':
+            assert(len(sexpr) == 2)
+            string = parse_expr(sexpr[1])
+            return StringLenExpr(string)
+        elif head == '+':
+            assert(len(sexpr) == 3)
+            lhs = parse_expr(sexpr[1])
+            rhs = parse_expr(sexpr[2])
+            return AddExpr(lhs, rhs)
+        else:
+            try:
+                n = int(head)
+                return IntExpr(n)
+            except:
+                pass
+        assert False, 'Unknown expr: {}'.format(sexpr)
     def parse_func(sexpr, location):
+        global num_locals, extra_locals
         assert(sexpr[0] == 'func')
         name = sexpr[1]
         # external name
@@ -90,8 +119,13 @@ def parse(body):
         params = sexpr[3][1:]
         assert(sexpr[4][0] == 'result')
         results = sexpr[4][1:]
-        body = sexpr[5:]
-        return Func(name, exname, params, results, body, location)
+        num_locals = len(params)
+        extra_locals = []
+        body = [parse_expr(expr) for expr in sexpr[5:]]
+        func = Func(name, exname, params, results, body, location)
+        for expr in body:
+            expr.initialize(func=func)
+        return func
 
     def parse_module_elem(mod, sexpr):
         if sexpr[0] == 'func':
@@ -129,5 +163,13 @@ def parse(body):
             func = parse_func(group, ['component'])
             component.funcs.append(func)
             component.add_func(func)
+
+    for func in component.all_funcs_iter():
+        # TODO: implement all_funcs_iter
+        component.all_funcs[func.name] = func
+    for func in component.all_funcs_iter():
+        print '=== initing func: ', func.name
+        for expr in func.body:
+            expr.post_init(component=component)
 
     return component
