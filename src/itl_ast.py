@@ -30,6 +30,7 @@ class Func(object):
         self.params = params
         self.results = results
         self.body = body
+        self.extra_locals = []
         self.location = location
 
 class Module(object):
@@ -46,6 +47,8 @@ class BaseExpr(object):
     # Computed properties are set dynamically
 
     # Helper methods for setting computed properties
+    # ... can probably refactor this to just iterate over children,
+    # don't need to generalize to two-argument traversals
     def zero(self):
         # call my own 0-arg f
         return self.f()
@@ -72,13 +75,12 @@ class BaseExpr(object):
         self.set_field('func', kwargs['func'])
 
     def post_init(self, **kwargs):
-        print 'BaseExpr post_init', self
+        # recurse to all non-self children and post_init them
         self.f = lambda ex: ex.post_init(**kwargs) if ex else None
         self.one(lambda ex: None if ex == self else ex)
-        # self.f = lambda ex: None if ex == self else ex
-        # self.one(lambda ex: ex.post_init(**kwargs) if ex else None)
 
     def set_field(self, field, val):
+        # set field to val for self and all children
         self.f = lambda ex: setattr(ex, field, val)
         self.one(lambda ex: ex)
 
@@ -104,6 +106,8 @@ class LocalExpr(BaseExpr):
 
     def as_js(self):
         return 'x' + str(self.idx)
+    def as_wat(self):
+        return '(local.get {})'.format(self.idx)
 
 class CallExpr(BaseExpr):
     def __init__(self, func_name, args):
@@ -112,17 +116,20 @@ class CallExpr(BaseExpr):
 
     def children(self):
         return self.args
+    def ty(self):
+        res = self.target_func.results
+        assert(len(res) <= 1)
+        if res:
+            return res[0]
+        else:
+            return 'void'
 
     def post_init(self, **kwargs):
-        print 'CallExpr post_init', self
-        func = kwargs['component'].all_funcs[self.func_name]
-        print '  initing w/ func=', func.name
-        setattr(self, 'target_func', func)
-        print self.target_func
         super(CallExpr, self).post_init(**kwargs)
+        func = kwargs['component'].all_funcs[self.func_name]
+        setattr(self, 'target_func', func)
 
     def as_js(self):
-        print 'CallExpr as_js', self, self.func_name
         func = self.target_func
         args = ', '.join(arg.as_js() for arg in self.args)
         if func.location[0] == 'import':
@@ -137,6 +144,9 @@ class CallExpr(BaseExpr):
             return '{}({})'.format(self.func_name, args)
         else:
             assert False, 'Unknown location for func: ' + str(func.location)
+    def as_wat(self):
+        args = ' '.join(arg.as_wat() for arg in self.args)
+        return '(call ${} {})'.format(self.func_name, args)
 
 class LetExpr(BaseExpr):
     def __init__(self, idx, expr):
@@ -146,8 +156,14 @@ class LetExpr(BaseExpr):
     def children(self):
         return [self.expr]
 
+    def post_init(self, **kwargs):
+        super(LetExpr, self).post_init(**kwargs)
+        self.func.extra_locals.append(self.expr.ty())
+
     def as_js(self):
         return 'let x{} = {}'.format(self.idx, self.expr.as_js())
+    def as_wat(self):
+        return '(local.set {} {})'.format(self.idx, self.expr.as_wat())
 
 class MemToStringExpr(BaseExpr):
     def __init__(self, module, memory, ptr, length):
@@ -162,6 +178,9 @@ class MemToStringExpr(BaseExpr):
     def as_js(self):
         return 'memToString({}[{}], {}, {})'.format(
             self.module, self.memory, self.ptr.as_js(), self.length.as_js())
+    def as_wat(self):
+        return '(call $_it_mem_to_string {} {})'.format(
+            self.ptr.as_wat(), self.length.as_wat())
 
 class StringToMemExpr(BaseExpr):
     def __init__(self, module, memory, string, ptr):
@@ -176,6 +195,9 @@ class StringToMemExpr(BaseExpr):
     def as_js(self):
         return 'stringToMem({}[{}], {}, {})'.format(
             self.module, self.memory, self.string.as_js(), self.ptr.as_js())
+    def as_wat(self):
+        return '(call $_it_string_to_mem {} {})'.format(
+            self.string.as_wat(), self.ptr.as_wat())
 
 class StringLenExpr(BaseExpr):
     def __init__(self, expr):
@@ -183,9 +205,13 @@ class StringLenExpr(BaseExpr):
 
     def children(self):
         return [self.expr]
+    def ty(self):
+        return 's32'
 
     def as_js(self):
         return '{}.length'.format(self.expr.as_js())
+    def as_wat(self):
+        return '(call $_it_string_len {})'.format(self.expr.as_wat())
 
 class AddExpr(BaseExpr):
     def __init__(self, lhs, rhs):
@@ -197,6 +223,8 @@ class AddExpr(BaseExpr):
 
     def as_js(self):
         return '({} + {})'.format(self.lhs.as_js(), self.rhs.as_js())
+    def as_wat(self):
+        return '(i32.add {} {})'.format(self.lhs.as_wat(), self.rhs.as_wat())
 
 class IntExpr(BaseExpr):
     def __init__(self, val):
@@ -204,3 +232,5 @@ class IntExpr(BaseExpr):
 
     def as_js(self):
         return str(self.val)
+    def as_wat(self):
+        return '(i32.const {})'.format(self.val)

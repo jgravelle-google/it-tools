@@ -11,7 +11,7 @@ out/%.cpp out/%.itl: %.cpp
 	# TODO: explicit outputs here
 	python ../../src/cpp_itl_generator.py $<
 
-out/%.wasm: out/%.cpp
+out/%.wasm: out/%.cpp out/%.itl
 	python ../../src/wasm_adapter.py out/$*.itl
 	wat2wasm out/$*_pre.wat -o out/$*_pre.wasm --debug-names
 	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -Iout -I. -std=c++11

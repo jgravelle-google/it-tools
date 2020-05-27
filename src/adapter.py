@@ -29,9 +29,7 @@ def ensure_path(path):
         pass
 
 # NodeJS wrapper module
-num_locals = 0
 def write_js_module(component):
-    global num_locals # thanks python
     def escape(s):
         return s.replace('\\', '/')
 
@@ -44,7 +42,6 @@ def write_js_module(component):
         else:
             decl = '"{}": function'.format(func.exname)
         ret += tab * n_indent + '{}({}) {{\n'.format(decl, params)
-        num_locals = len(func.params)
         for i in range(len(func.body)):
             sexpr = func.body[i]
             ret += tab * (n_indent + 1)

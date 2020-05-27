@@ -113,16 +113,14 @@ def parse(body):
         global num_locals, extra_locals
         assert(sexpr[0] == 'func')
         name = sexpr[1]
-        # external name
-        exname = unquote(sexpr[2])
+        external_name = unquote(sexpr[2])
         assert(sexpr[3][0] == 'param')
         params = sexpr[3][1:]
         assert(sexpr[4][0] == 'result')
         results = sexpr[4][1:]
         num_locals = len(params)
-        extra_locals = []
         body = [parse_expr(expr) for expr in sexpr[5:]]
-        func = Func(name, exname, params, results, body, location)
+        func = Func(name, external_name, params, results, body, location)
         for expr in body:
             expr.initialize(func=func)
         return func
@@ -164,11 +162,11 @@ def parse(body):
             component.funcs.append(func)
             component.add_func(func)
 
+    # set lookup table for name -> func
     for func in component.all_funcs_iter():
-        # TODO: implement all_funcs_iter
         component.all_funcs[func.name] = func
+    # post-initialize now that AST is fully built
     for func in component.all_funcs_iter():
-        print '=== initing func: ', func.name
         for expr in func.body:
             expr.post_init(component=component)
 

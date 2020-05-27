@@ -170,8 +170,8 @@ def main():
     itl_contents += '(export\n'
     for func in ast.exports:
         ret = func.ret if func.ret != 'void' else ''
-        itl_contents += tab + '(func _ "{}" (param {}) (result {})\n'.format(
-            func.name, ' '.join(func.args), ret)
+        itl_contents += tab + '(func it_{} "{}" (param {}) (result {})\n'.format(
+            func.name, func.name, ' '.join(func.args), ret)
         args = ''
         for i, arg in enumerate(func.args):
             local = '(local {})'.format(i)
