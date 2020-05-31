@@ -238,11 +238,22 @@ class Lexer(object):
             self.tokens.append(self.cur)
         self.cur = ''
 
+    def peek(self):
+        return self.contents[self.i];
+    def pop(self):
+        ret = self.peek()
+        self.i += 1
+        return ret
+
     def lex(self):
         while self.i < len(self.contents):
-            c = self.contents[self.i]
-            self.i += 1
-            if c in ' \n\r\t':
+            c = self.pop()
+            if c == '/' and self.peek() == '/':
+                self.pop()
+                self.term()
+                while self.peek() not in '\n\r':
+                    self.pop()
+            elif c in ' \n\r\t':
                 self.term()
             elif c in '(){},;':
                 self.term()
