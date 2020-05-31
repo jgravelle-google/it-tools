@@ -17,8 +17,8 @@ def run(cmd):
 watchpaths = []
 i = 1
 while sys.argv[i] != '--':
-    i += 1
     watchpaths.append(sys.argv[i])
+    i += 1
 assert(sys.argv[i] == '--')
 i += 1
 cmd = sys.argv[i:]
@@ -33,10 +33,11 @@ def update_times():
             for name in files:
                 base, ext = os.path.splitext(name)
                 filename = os.path.join(path, name)
+                cachename = watchpath + ':' + filename
                 mtime = os.path.getmtime(filename)
-                if times.get(filename) != mtime:
+                if times.get(cachename) != mtime:
                     updated = True
-                times[filename] = mtime
+                times[cachename] = mtime
     return updated
 while True:
     if update_times():

@@ -79,6 +79,8 @@ def main():
     for func in ast.exports:
         attr = '__attribute__((export_name("{}")))'.format(func.name)
         export_decls += attr + ' ' + it_to_cpp_func(func)
+    for ty, funcs in ast.types.iteritems():
+        print 'TYPES', ty
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
 
     #############################################
@@ -211,14 +213,20 @@ def main():
     write_file(itl_out, itl_contents)
 
 class AST(object):
-    def __init__(self, imports, exports):
+    def __init__(self, imports, exports, types):
         self.imports = imports
         self.exports = exports
+        self.types = types
 class Func(object):
     def __init__(self, name, args, ret):
         self.name = name
         self.args = args
         self.ret = ret
+class Type(object):
+    def __init__(self, name, import_name, funcs):
+        self.name = name
+        self.import_name = import_name
+        self.funcs = funcs
 
 def parse_it(contents):
     tokens = Lexer(contents).lex()
@@ -271,6 +279,7 @@ class Parser(object):
     def parse(self):
         imports = {}
         exports = []
+        types = {}
         while self.i < len(self.tokens):
             head = self.pop()
             if head == 'export':
@@ -282,19 +291,30 @@ class Parser(object):
                         self.expect('}')
                         break
             elif head == 'import':
-                name = unquote(self.pop())
-                self.expect('{')
-                funcs = []
-                while True:
-                    if self.peek() == 'func':
-                        funcs.append(self.parse_func())
-                    else:
-                        self.expect('}')
-                        break
+                name, funcs = self.parse_import()
                 imports[name] = funcs
+            elif head == 'type':
+                name = self.pop()
+                self.expect('=')
+                # TODO: currently assume types are all imports
+                self.expect('import')
+                import_name, funcs = self.parse_import()
+                types[name] = Type(name, import_name, funcs)
             else:
                 assert False, 'unknown top-level stmt'
-        return AST(imports, exports)
+        return AST(imports, exports, types)
+
+    def parse_import(self):
+        name = unquote(self.pop())
+        self.expect('{')
+        funcs = []
+        while True:
+            if self.peek() == 'func':
+                funcs.append(self.parse_func())
+            else:
+                self.expect('}')
+                break
+        return name, funcs
 
     def parse_func(self):
         self.expect('func')
