@@ -14,23 +14,29 @@ def run(cmd):
     pid = subprocess.Popen(cmd)
     return pid.communicate()
 
-watchpath = sys.argv[1]
-assert(sys.argv[2] == '--')
-cmd = sys.argv[3:]
-print 'watchpath:', watchpath
+watchpaths = []
+i = 1
+while sys.argv[i] != '--':
+    i += 1
+    watchpaths.append(sys.argv[i])
+assert(sys.argv[i] == '--')
+i += 1
+cmd = sys.argv[i:]
+print 'watchpaths:', watchpaths
 print 'command:', cmd
 
 times = {}
 def update_times():
     updated = False
-    for path, _, files in os.walk(watchpath):
-        for name in files:
-            base, ext = os.path.splitext(name)
-            filename = os.path.join(path, name)
-            mtime = os.path.getmtime(filename)
-            if times.get(filename) != mtime:
-                updated = True
-            times[filename] = mtime
+    for watchpath in watchpaths:
+        for path, _, files in os.walk(watchpath):
+            for name in files:
+                base, ext = os.path.splitext(name)
+                filename = os.path.join(path, name)
+                mtime = os.path.getmtime(filename)
+                if times.get(filename) != mtime:
+                    updated = True
+                times[filename] = mtime
     return updated
 while True:
     if update_times():
