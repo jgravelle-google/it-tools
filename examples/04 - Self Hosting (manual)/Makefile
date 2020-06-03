@@ -3,7 +3,7 @@ run: build
 .PHONY: run
 
 build: out out/fizzbuzz.wasm out/fizz.wasm out/buzz.wasm \
-out/pre_fizzbuzz.wasm out/pre_fizz.wasm out/pre_buzz.wasm
+out/it_fizzbuzz.wasm out/pre_fizz.wasm out/pre_buzz.wasm
 
 out:
 	mkdir -p out
@@ -17,4 +17,4 @@ out/%.wasm: out/%.cpp
 	wasm-decompile $@ -o out/$*.wade
 
 out/%.wasm: %.wat
-	wat2wasm $< -o $@ --debug-names
+	wat2wasm --enable-reference-types $< -o $@ --debug-names
