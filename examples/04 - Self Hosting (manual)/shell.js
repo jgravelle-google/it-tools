@@ -2,8 +2,8 @@ async function run() {
     try {
         // Load modules
         let loader = require('./it_loader.js');
-        let fizz = await require('./fizz.js').instantiate({});
-        let buzz = await require('./buzz.js').instantiate({});
+        let fizz = await loader.instantiate('out/it_fizz.wasm', {});
+        let buzz = await loader.instantiate('out/it_buzz.wasm', {});
         let fizzbuzz = await loader.instantiate('out/it_fizzbuzz.wasm', {
             fizz, buzz,
             console: {

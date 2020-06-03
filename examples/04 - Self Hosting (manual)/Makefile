@@ -3,7 +3,7 @@ run: build
 .PHONY: run
 
 build: out out/fizzbuzz.wasm out/fizz.wasm out/buzz.wasm \
-out/it_fizzbuzz.wasm out/pre_fizz.wasm out/pre_buzz.wasm
+out/it_fizzbuzz.wasm out/it_fizz.wasm out/it_buzz.wasm
 
 out:
 	mkdir -p out

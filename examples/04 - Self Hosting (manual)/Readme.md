@@ -1,5 +1,7 @@
 # Self Hosting
 
+**NOTE**: implementation has changed, this is out of date
+
 This example demonstrates how one might implement IT adapters in Wasm itself.
 
 It depends on the bulk-memory proposal for maximum efficiency, but can be

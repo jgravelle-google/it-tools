@@ -74,6 +74,7 @@ module.exports = {
                 for (let key in imports) {
                     wasm_imports[key] = self;
                 }
+                // XXX: awkwardness because we can't async here
                 return loadModuleSync(filename, wasm_imports);
             },
             set_table(name, idx, val) {
