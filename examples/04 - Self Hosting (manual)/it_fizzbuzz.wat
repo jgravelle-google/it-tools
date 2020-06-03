@@ -10,8 +10,7 @@
 (import "_it_runtime" "mem_to_string" (func $mem_to_string (param anyref i32 i32 i32) (result anyref)))
 (import "_it_runtime" "string_to_mem" (func $string_to_mem (param anyref i32 anyref i32)))
 (import "_it_runtime" "load_wasm" (func $load_wasm (param i32) (result anyref)))
-(import "_it_runtime" "set_table" (func $set_table (param i32 i32 anyref)))
-(import "_it_runtime" "get_func" (func $get_func (param anyref i32) (result anyref)))
+(import "_it_runtime" "set_table_func" (func $set_table_func (param i32 anyref i32)))
 
 (global $wasm_instance (mut anyref) (ref.null))
 
@@ -82,37 +81,21 @@
             (i32.const 0) ;; "out/fizzbuzz.wasm"
         )
     )
-    (call $set_table
-        (i32.const 72) ;; "_it_table"
-        (i32.const 0)
-        (call $get_func
-            (global.get $wasm_instance)
-            (i32.const 27) ;; "malloc"
-        )
+    (call $set_table_func (i32.const 0)
+        (global.get $wasm_instance)
+        (i32.const 27) ;; "malloc"
     )
-    (call $set_table
-        (i32.const 72) ;; "_it_table"
-        (i32.const 1)
-        (call $get_func
-            (global.get $wasm_instance)
-            (i32.const 45) ;; "_it_writeStringTerm"
-        )
+    (call $set_table_func (i32.const 1)
+        (global.get $wasm_instance)
+        (i32.const 45) ;; "_it_writeStringTerm"
     )
-    (call $set_table
-        (i32.const 72) ;; "_it_table"
-        (i32.const 2)
-        (call $get_func
-            (global.get $wasm_instance)
-            (i32.const 34) ;; "_it_strlen"
-        )
+    (call $set_table_func (i32.const 2)
+        (global.get $wasm_instance)
+        (i32.const 34) ;; "_it_strlen"
     )
-    (call $set_table
-        (i32.const 72) ;; "_it_table"
-        (i32.const 3)
-        (call $get_func
-            (global.get $wasm_instance)
-            (i32.const 18) ;; "fizzbuzz"
-        )
+    (call $set_table_func (i32.const 3)
+        (global.get $wasm_instance)
+        (i32.const 18) ;; "fizzbuzz"
     )
 )
 

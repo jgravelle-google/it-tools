@@ -77,14 +77,13 @@ module.exports = {
                 // XXX: awkwardness because we can't async here
                 return loadModuleSync(filename, wasm_imports);
             },
-            set_table(name, idx, val) {
-                let table = readITValue(name);
+            set_table_func(idx, mod, namePtr) {
+                // sets IT table index to a property on a module
+                let table = self._it_table;
+                let name = readITString(namePtr);
+                let val = mod[name];
                 table.set(idx, val);
             },
-            get_func(mod, name) {
-                let prop = readITString(name);
-                return mod[prop];
-            }
         };
 
         let modified_imports = { _it_runtime };
