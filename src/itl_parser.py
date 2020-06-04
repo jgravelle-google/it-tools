@@ -82,14 +82,14 @@ def parse(body):
         elif head == 'mem-to-string':
             assert(len(sexpr) == 5)
             mod = sexpr[1]
-            mem = sexpr[2]
+            mem = unquote(sexpr[2])
             ptr = parse_expr(sexpr[3])
             length = parse_expr(sexpr[4])
             return MemToStringExpr(mod, mem, ptr, length)
         elif head == 'string-to-mem':
             assert(len(sexpr) == 5)
             mod = sexpr[1]
-            mem = sexpr[2]
+            mem = unquote(sexpr[2])
             string = parse_expr(sexpr[3])
             ptr = parse_expr(sexpr[4])
             return StringToMemExpr(mod, mem, string, ptr)

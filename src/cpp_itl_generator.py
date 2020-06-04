@@ -148,9 +148,10 @@ def main():
     for imp, funcs in ast.imports.iteritems():
         itl_contents += tab + '(import "{}"\n'.format(imp)
         for func in funcs:
-            ret = func.ret if func.ret != 'void' else ''
-            itl_contents += tab * 2 + '(func _ "{}" (param {}) (result {})\n'.format(
-                func.name, ' '.join(func.args), ret)
+            args = ' '.join(it_to_wasm_ty(arg) for arg in func.args)
+            ret = it_to_wasm_ty(func.ret) if func.ret != 'void' else ''
+            itl_contents += tab * 2 + '(func _it_{} "{}" (param {}) (result {})\n'.format(
+                func.name, func.name, args, ret)
             args = ''
             for i, arg in enumerate(func.args):
                 local = '(local {})'.format(i)
@@ -172,7 +173,7 @@ def main():
     itl_contents += '(export\n'
     for func in ast.exports:
         ret = func.ret if func.ret != 'void' else ''
-        itl_contents += tab + '(func it_{} "{}" (param {}) (result {})\n'.format(
+        itl_contents += tab + '(func _it_{} "{}" (param {}) (result {})\n'.format(
             func.name, func.name, ' '.join(func.args), ret)
         args = ''
         for i, arg in enumerate(func.args):

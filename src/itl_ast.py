@@ -10,18 +10,35 @@ class Component(object):
         # lookup table for all functions by name
         self.all_funcs = {}
 
+        self.next_string = 0
+        self.string_table = {}
+
     def add_func(self, func):
         self.all_funcs[func.name] = func
 
     def all_funcs_iter(self):
-        for k, v in self.imports.iteritems():
-            print 'import', k, v
+        for imp in self.imports.itervalues():
+            for func in imp:
+                yield func
         for func in self.exports:
             yield func
         for mod in self.modules:
-            print 'module', mod
+            for func in mod.funcs:
+                yield func
         for func in self.funcs:
             yield func
+
+    def wat_string(self, val):
+        if val in self.string_table:
+            return self.string_table[val]
+        idx = self.next_string
+        length = len(val)
+        assert length <= 0xff, 'String literal too long: "{}"'.format(val)
+        # bump space by len + 1 length byte
+        self.next_string += len(val) + 1
+        ret = '(i32.const {})'.format(idx)
+        self.string_table[val] = ret
+        return ret
 
 class Func(object):
     def __init__(self, name, exname, params, results, body, location):
@@ -75,6 +92,7 @@ class BaseExpr(object):
         self.set_field('func', kwargs['func'])
 
     def post_init(self, **kwargs):
+        self.component = kwargs['component']
         # recurse to all non-self children and post_init them
         self.f = lambda ex: ex.post_init(**kwargs) if ex else None
         self.one(lambda ex: None if ex == self else ex)
@@ -126,7 +144,7 @@ class CallExpr(BaseExpr):
 
     def post_init(self, **kwargs):
         super(CallExpr, self).post_init(**kwargs)
-        func = kwargs['component'].all_funcs[self.func_name]
+        func = self.component.all_funcs[self.func_name]
         setattr(self, 'target_func', func)
 
     def as_js(self):
@@ -176,10 +194,11 @@ class MemToStringExpr(BaseExpr):
         return [self.ptr, self.length]
 
     def as_js(self):
-        return 'memToString({}[{}], {}, {})'.format(
+        return 'memToString({}["{}"], {}, {})'.format(
             self.module, self.memory, self.ptr.as_js(), self.length.as_js())
     def as_wat(self):
-        return '(call $_it_mem_to_string {} {})'.format(
+        return '(call $_it_mem_to_string (global.get ${}) {} {} {})'.format(
+            self.module, self.component.wat_string(self.memory),
             self.ptr.as_wat(), self.length.as_wat())
 
 class StringToMemExpr(BaseExpr):
@@ -193,10 +212,11 @@ class StringToMemExpr(BaseExpr):
         return [self.string, self.ptr]
 
     def as_js(self):
-        return 'stringToMem({}[{}], {}, {})'.format(
+        return 'stringToMem({}["{}"], {}, {})'.format(
             self.module, self.memory, self.string.as_js(), self.ptr.as_js())
     def as_wat(self):
-        return '(call $_it_string_to_mem {} {})'.format(
+        return '(call $_it_string_to_mem (global.get ${}) {} {} {})'.format(
+            self.module, self.component.wat_string(self.memory),
             self.string.as_wat(), self.ptr.as_wat())
 
 class StringLenExpr(BaseExpr):
