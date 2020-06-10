@@ -101,6 +101,7 @@ We can transcribe those functions into wasm that looks like:
 TODO
 
 * break down init function
+* talk about how string literals are represented
 
 ### Loader JS
 

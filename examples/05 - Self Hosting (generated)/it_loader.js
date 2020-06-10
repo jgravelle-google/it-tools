@@ -28,7 +28,7 @@ module.exports = {
             return str;
         }
         function readITString(ptr) {
-           // Read IT-module string
+            // Read IT-module string
             // ABI is first byte = length, followed by chars
 
             // If string has been read before, just reuse it
@@ -91,7 +91,7 @@ module.exports = {
             modified_imports[key] = imports[key];
         }
         self = await loadModule(filename, modified_imports);
-        self.init();
+        self._it_init();
         return self;
     },
 };

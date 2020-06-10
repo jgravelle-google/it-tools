@@ -45,7 +45,7 @@ def write_wat_module(component):
     def it_to_wat_ty(ty):
         if ty == 'string':
             return 'anyref'
-        elif ty in ['u1', 's8', 's32', 'u32']:
+        elif ty in ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']:
             return 'i32'
         return ty
     def func_ty(func):
@@ -114,7 +114,7 @@ def write_wat_module(component):
         func_str += function(func, n_indent=0, is_export=True)
 
     # build init after collecting exported function indices
-    init_str = '(func (export "init")\n'
+    init_str = '(func (export "_it_init")\n'
     for module in component.modules:
         init_str += tab + '(global.set ${} (call $_it_load_wasm {}))\n'.format(
             module.name, component.wat_string(module.path))
