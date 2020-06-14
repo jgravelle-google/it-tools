@@ -197,7 +197,7 @@ class MemToStringExpr(BaseExpr):
         return 'memToString({}["{}"], {}, {})'.format(
             self.module, self.memory, self.ptr.as_js(), self.length.as_js())
     def as_wat(self):
-        return '(call $_it_mem_to_string (global.get ${}) {} {} {})'.format(
+        return '(call $_it_mem_to_string (call $i32_to_ref (global.get ${})) {} {} {})'.format(
             self.module, self.component.wat_string(self.memory),
             self.ptr.as_wat(), self.length.as_wat())
 
@@ -215,7 +215,7 @@ class StringToMemExpr(BaseExpr):
         return 'stringToMem({}["{}"], {}, {})'.format(
             self.module, self.memory, self.string.as_js(), self.ptr.as_js())
     def as_wat(self):
-        return '(call $_it_string_to_mem (global.get ${}) {} {} {})'.format(
+        return '(call $_it_string_to_mem (call $i32_to_ref (global.get ${})) {} {} {})'.format(
             self.module, self.component.wat_string(self.memory),
             self.string.as_wat(), self.ptr.as_wat())
 

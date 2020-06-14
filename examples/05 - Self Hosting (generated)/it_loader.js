@@ -53,6 +53,24 @@ module.exports = {
             return self[str];
         }
 
+        let ref_table = new WeakMap();
+        let i32_table = {};
+        let next_ref_id = 0;
+        function ref_to_i32(ref) {
+            if (!ref_table.has(ref)) {
+                ref_table.set(ref, next_ref_id);
+                i32_table[next_ref_id] = ref;
+                next_ref_id++;
+            }
+            return ref_table.get(ref);
+        }
+        function i32_to_ref(idx) {
+            if (i32_table[idx] === undefined) {
+                throw new Error('[i32_to_ref] unknown i32 value: ' + idx);
+            }
+            return i32_table[idx];
+        }
+
         let _it_runtime = {
             string_len: (str) => str.length,
             mem_to_string: (mod, mem, ptr, len) => {
@@ -84,6 +102,8 @@ module.exports = {
                 let val = mod[name];
                 table.set(idx, val);
             },
+            ref_to_i32,
+            i32_to_ref,
         };
 
         let modified_imports = { _it_runtime };

@@ -44,7 +44,7 @@ def write_wat_module(component):
     # TODO: emit real wasm, not wat
     def it_to_wat_ty(ty):
         if ty == 'string':
-            return 'anyref'
+            return 'externref'
         elif ty in ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']:
             return 'i32'
         return ty
@@ -71,11 +71,13 @@ def write_wat_module(component):
 
     # Paths and setup
     import_str = '''
-(import "_it_runtime" "string_len" (func $_it_string_len (param anyref) (result i32)))
-(import "_it_runtime" "mem_to_string" (func $_it_mem_to_string (param anyref i32 i32 i32) (result anyref)))
-(import "_it_runtime" "string_to_mem" (func $_it_string_to_mem (param anyref i32 anyref i32)))
-(import "_it_runtime" "load_wasm" (func $_it_load_wasm (param i32) (result anyref)))
-(import "_it_runtime" "set_table_func" (func $_it_set_table_func (param i32 anyref i32)))
+(import "_it_runtime" "string_len" (func $_it_string_len (param externref) (result i32)))
+(import "_it_runtime" "mem_to_string" (func $_it_mem_to_string (param externref i32 i32 i32) (result externref)))
+(import "_it_runtime" "string_to_mem" (func $_it_string_to_mem (param externref i32 externref i32)))
+(import "_it_runtime" "load_wasm" (func $_it_load_wasm (param i32) (result externref)))
+(import "_it_runtime" "set_table_func" (func $_it_set_table_func (param i32 externref i32)))
+(import "_it_runtime" "ref_to_i32" (func $ref_to_i32 (param externref) (result i32)))
+(import "_it_runtime" "i32_to_ref" (func $i32_to_ref (param i32) (result externref)))
 '''
     tab = '    '
 
@@ -93,7 +95,7 @@ def write_wat_module(component):
     global_str = ''
     func_str = ''
     for module in component.modules:
-        global_str += '(global ${} (mut anyref) (ref.null))\n'.format(module.name)
+        global_str += '(global ${} (mut i32) (i32.const -1))\n'.format(module.name)
         for imp, funcs in module.imports.iteritems():
             for func in funcs:
                 func_str += function(func, n_indent=0, is_export=True)
@@ -116,11 +118,11 @@ def write_wat_module(component):
     # build init after collecting exported function indices
     init_str = '(func (export "_it_init")\n'
     for module in component.modules:
-        init_str += tab + '(global.set ${} (call $_it_load_wasm {}))\n'.format(
+        init_str += tab + '(global.set ${} (call $ref_to_i32 (call $_it_load_wasm {})))\n'.format(
             module.name, component.wat_string(module.path))
         for func in module.funcs:
             idx = table_table[func.name]
-            init_str += tab + '(call $_it_set_table_func (i32.const {}) (global.get ${}) {})\n'.format(
+            init_str += tab + '(call $_it_set_table_func (i32.const {}) (call $i32_to_ref (global.get ${})) {})\n'.format(
                 idx, module.name, component.wat_string(func.exname))
     init_str += ')\n'
 

@@ -14,5 +14,5 @@ out/%.cpp out/%.itl: %.cpp
 out/%.wasm: out/%.cpp out/%.itl
 	python ../../src/wasm_adapter.py out/$*.itl -o out/it_$*.wat
 	wat2wasm --enable-reference-types out/it_$*.wat -o out/it_$*.wasm --debug-names
-	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -Iout -I. -std=c++11
+	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -Iout -I. -std=c++11 --no-entry
 	wasm-decompile $@ -o out/$*.wade
