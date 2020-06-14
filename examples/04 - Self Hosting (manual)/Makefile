@@ -13,7 +13,7 @@ out/%.cpp: %.cpp
 	python ../../src/cpp_itl_generator.py $<
 
 out/%.wasm: out/%.cpp
-	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -Iout -I. -std=c++11
+	emcc $< -o $@ -O1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -Iout -I. -std=c++11 --no-entry
 	wasm-decompile $@ -o out/$*.wade
 
 out/%.wasm: %.wat
