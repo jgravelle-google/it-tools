@@ -9,21 +9,14 @@ let ITLoader = {
             let wasm = await WebAssembly.instantiate(bytes, wrappedImports);
             return wasm.instance.exports;
         }
-       function loadModuleSync(path, wrappedImports) {
-            // sync xhr!
+        function loadModuleSync(path, wrappedImports) {
+            // sync xhr! "ok" because we're on a worker
             let xhr = new XMLHttpRequest();
             xhr.open('GET', path, false);
+            xhr.responseType = 'arraybuffer';
             xhr.send(null);
 
-            // convert result to array buffer
-            let str = xhr.response;
-            let bytes = new ArrayBuffer(str.length);
-            var u8 = new Uint8Array(bytes);
-
-            for (let i = 0; i < str.length; ++i) {
-                u8[i] = str.charCodeAt(i);
-            }
-
+            let bytes = xhr.response;
             let mod = new WebAssembly.Module(bytes);
             let wasm = new WebAssembly.Instance(mod, wrappedImports);
             return wasm.exports;

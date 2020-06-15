@@ -1,4 +1,5 @@
 async function run() {
+    importScripts('it_loader.js');
     try {
         // Load modules
         let fizz = await ITLoader.instantiate('out/it_fizz.wasm', {});
