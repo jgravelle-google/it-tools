@@ -162,9 +162,6 @@ def parse(body):
             component.funcs.append(func)
             component.add_func(func)
 
-    # set lookup table for name -> func
-    for func in component.all_funcs_iter():
-        component.all_funcs[func.name] = func
     # post-initialize now that AST is fully built
     for func in component.all_funcs_iter():
         for expr in func.body:

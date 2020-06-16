@@ -1,13 +1,12 @@
-let fs = require('fs');
-
-module.exports = {
-    instantiate: async function(imports) {
+const /**COMPONENT_NAME**/ = {
+    async instantiate(imports) {
 /**MODULE_NAMES**/
 
         // Loads specified modules
         async function loadModule(path, wrappedImports) {
-            let contents = fs.readFileSync(path);
-            let wasm = await WebAssembly.instantiate(contents, wrappedImports);
+            let contents = await fetch(path);
+            let bytes = await contents.arrayBuffer();
+            let wasm = await WebAssembly.instantiate(bytes, wrappedImports);
             return wasm.instance.exports;
         }
 
@@ -37,5 +36,5 @@ module.exports = {
         };
 
         return wrappedExports;
-    },
+    }
 };

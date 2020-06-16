@@ -2,16 +2,36 @@
 
 # Generates a JS adapter module from an IDL file
 
+import argparse
 import os
 import sys
 import traceback
 
 import itl_parser
 
-outpath = 'out'
-itl_path = sys.argv[1]
+arg_parser = argparse.ArgumentParser()
+arg_parser.add_argument('itl_in')
+arg_parser.add_argument('-o', dest='js_out', default=None)
+arg_parser.add_argument('--node', dest='do_node', action='store_true')
+arg_parser.add_argument('--name', dest='component_name', default=None)
+args = arg_parser.parse_args(sys.argv[1:])
+
+# TODO: actually re-support node scripts
+
+itl_path = args.itl_in
 itl_filename = os.path.basename(itl_path)
 basename, _ = os.path.splitext(itl_filename)
+if args.js_out:
+    js_path = args.js_out
+    outpath = os.path.basename(js_path)
+else:
+    outpath = 'out'
+    js_path = os.path.join(outpath, basename + '.js')
+if args.component_name:
+    component_name = args.component_name
+else:
+    component_name = basename + 'Component'
+
 srcpath = os.path.dirname(__file__)
 
 def main():
@@ -57,10 +77,11 @@ def write_js_module(component):
         return ret
 
     # Paths and setup
-    js_path = os.path.join(outpath, basename + '.js')
     template_path = os.path.join(srcpath, 'wrapper_module_template.js')
     js_str = open(template_path).read()
     tab = '    '
+
+    js_str = js_str.replace('/**COMPONENT_NAME**/', component_name)
 
     module_names = ''
     load_modules = ''        
