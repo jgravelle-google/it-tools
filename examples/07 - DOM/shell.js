@@ -1,10 +1,16 @@
+let list = document.createElement('ul');
+document.body.append(list);
+
+function log(x) {
+    let item = document.createElement('li');
+    item.innerText = x;
+    list.append(item);
+}
+
 async function run() {
     // Load modules
     let fizz = await fizzComponent.instantiate({});
     let buzz = await buzzComponent.instantiate({});
-    function log(x) {
-        console.log('AAGH:',x);
-    }
     let fizzbuzz = await fizzbuzzComponent.instantiate({
         fizz, buzz,
         console: {
@@ -13,8 +19,19 @@ async function run() {
         },
     });
 
-    // Run it
-    fizzbuzz.fizzbuzz(20);
+    let input = document.getElementById('iterations');
+    function update() {
+        // clear existing list
+        while (list.children.length > 0) {
+            list.children[0].remove();
+        }
+
+        let iters = input.value | 0;
+        fizzbuzz.fizzbuzz(iters);
+    }
+
+    update();
+    input.onchange = update;
 }
 
 run();

@@ -2,9 +2,9 @@ serve: build
 	emrun --no_browser --port 8080 .
 .PHONY: serve
 
-build: out out/fizz.wasm out/buzz.wasm out/fizzbuzz.wasm \
-out/fizzbuzz.itl out/fizzbuzz.cpp \
-out/fizz.js out/buzz.js out/fizzbuzz.js
+build: out out/fizz.wasm out/buzz.wasm out/fizzbuzz.wasm out/dom_console.wasm \
+out/dom_console.itl out/dom_console.cpp \
+out/fizz.js out/buzz.js out/fizzbuzz.js out/dom_console.js
 
 out:
 	mkdir -p out
