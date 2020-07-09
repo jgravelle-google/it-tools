@@ -80,11 +80,11 @@ We can transcribe those functions into wasm that looks like:
 (func $isFizz (param i32) (result i32)
     (call_indirect (param i32) (result i32)
         (local.get 0)
-        (i32.const 0))
+        (i32.const 0)) ;; 0 = isFizz function index
 )
 (func $fizzStr (param ) (result i32)
     (call_indirect (param ) (result i32)
-         (i32.const 1))
+         (i32.const 1)) ;; 1 = fizzStr function index
 )
 
 ;; exported IT-wrapped versions
@@ -92,24 +92,83 @@ We can transcribe those functions into wasm that looks like:
     (local )
     (call $isFizz (local.get 0))
 )
-(func $_it_fizzStr (export "fizzStr") (param ) (result anyref)
+(func $_it_fizzStr (export "fizzStr") (param ) (result externref)
     (local )
     (call $_it_cppToString (call $fizzStr ))
 )
 ```
 
-TODO
+The core wasm functions are called via a call_indirect. This is so we can
+support loading multiple wasm modules from a single ITL, possibly with circular
+dependencies. (This is overkill for the simple C++ case, but is a useful
+mechanism for more general ITL usage).
 
-* break down init function
-* talk about how string literals are represented
+The IT-wrapped versions that are exported from this wrapper module use
+higher-level signatures. Specifically here, we convert `string` into `externref` so
+we can pass external objects by-reference across the boundary (JS strings in
+this case).
+
+There's another important piece here, the "\_it_init" function. This is called
+in order to initialize the wrapper module, by it_loader.js in this case. It
+looks like this:
+
+```wasm
+(func (export "_it_init")
+    (global.set $wasm (call $ref_to_i32 (call $_it_load_wasm (i32.const 7))))
+    (call $_it_set_table_func (i32.const 0) (call $i32_to_ref (global.get $wasm)) (i32.const 21))
+    (call $_it_set_table_func (i32.const 1) (call $i32_to_ref (global.get $wasm)) (i32.const 28))
+    (call $_it_set_table_func (i32.const 2) (call $i32_to_ref (global.get $wasm)) (i32.const 36))
+    (call $_it_set_table_func (i32.const 3) (call $i32_to_ref (global.get $wasm)) (i32.const 43))
+    (call $_it_set_table_func (i32.const 4) (call $i32_to_ref (global.get $wasm)) (i32.const 54))
+)
+```
+
+This loads the wasm module and stores a reference to it, accessible via a global.
+Then it populates the table of function references used by the call_indirects
+mentioned previously.
+
+The first `i32.const` arguments refer to function indices. The second `i32.const`s
+refer to the wrapper module's data section, which holds the string data used to
+read from the core module's exports. They look like so:
+
+```wasm
+(memory (export "_it_memory") 1)
+(data (i32.const 36) "\06malloc")
+(data (i32.const 28) "\07fizzStr")
+(data (i32.const 43) "\0a_it_strlen")
+(data (i32.const 7) "\0dout/fizz.wasm")
+(data (i32.const 21) "\06isFizz")
+(data (i32.const 54) "\13_it_writeStringTerm")
+(data (i32.const 0) "\06memory")
+```
+
+Here, strings are represented as a length byte, followed by the payload bytes.
+This is similar to how strings are encoded in the wasm binary format itself.
+If strings with length > 255 bytes are needed, we can use LEBs here in the
+future.
 
 ### Loader JS
 
-There's one shared JS file that handles loading any ITL-derived wasm modules.
-Its main purpose is to provide the five key IT runtime functions needed:
+There's one shared JS file that handles loading any ITL-derived wasm modules,
+it_loader.js. Its main purpose is to provide the key IT runtime functions needed:
 
 * `string_len`: reads the length of any IT strings
 * `mem_to_string`: reads a string out of wasm memory
 * `string_to_mem`: writes a string into wasm memory
 * `load_wasm`: loads and instantiates a wasm module (instance) from a filename
 * `set_table_func`: stores a function reference in the IT module's table
+* `ref_to_i32`: converts from an externref to an i32, to store in a mutable global
+* `i32_to_ref`: converts from i32 back to externref
+
+Additionally, the loader is responsible for maintaining the JS side of the runtime
+(specifically managing interop lookup tables for refs), and loading the wasm
+module. This is done via the `instantiate` function, which takes the path to the
+IT-wrapped module (which in turn has the path to the core module), as well as
+any imports.
+
+All in all, fizz.wasm can be loaded in NodeJS like so:
+
+```js
+let loader = require('./it_loader.js');
+let fizz = await loader.instantiate('out/it_fizz.wasm', {});
+```

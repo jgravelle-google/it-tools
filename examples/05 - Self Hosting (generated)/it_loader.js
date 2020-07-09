@@ -10,7 +10,7 @@ module.exports = {
             let wasm = await WebAssembly.instantiate(contents, wrappedImports);
             return wasm.instance.exports;
         }
-       function loadModuleSync(path, wrappedImports) {
+        function loadModuleSync(path, wrappedImports) {
             let contents = fs.readFileSync(path);
             let mod = new WebAssembly.Module(contents);
             let wasm = new WebAssembly.Instance(mod, wrappedImports);
