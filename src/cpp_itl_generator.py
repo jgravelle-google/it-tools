@@ -9,10 +9,17 @@ import traceback
 
 def main():
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('cpp_in')
-    arg_parser.add_argument('--cpp', dest='cpp_out', default=None)
-    arg_parser.add_argument('--itl', dest='itl_out', default=None)
-    arg_parser.add_argument('--wasm', dest='wasm_out', default=None)
+    arg_parser.add_argument('cpp_in', help='C++ file with CTL declarations')
+    arg_parser.add_argument(
+        '--cpp', dest='cpp_out', default=None,
+        help='Output C++ file with CTL stripped and replaced with function declarations')
+    arg_parser.add_argument(
+        '--itl', dest='itl_out', default=None,
+        help='Output ITL file')
+    arg_parser.add_argument(
+        '--wasm', dest='wasm_out', default=None,
+        help='Oputput wasm file. This path is baked into the ITL file, so should be'
+             ' overridden to match the core wasm module to be loaded')
     args = arg_parser.parse_args(sys.argv[1:])
 
     srcpath = os.path.dirname(__file__)

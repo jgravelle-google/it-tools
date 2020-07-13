@@ -20,12 +20,24 @@ a language-agnostic way.
 ## cpp_itl_generator.py
 
 Takes a C++ file that describes a wasm module, specified with a DSL specific to
-this script. The output of this is a header file with annotations that map to
-the imports and exports specified, as well as an ITL file that wraps the wasm
-module with adapter functions.
+this script (called CTL). The output of this is a header file with annotations
+that map to the imports and exports specified, as well as an ITL file that wraps
+the wasm module with adapter functions.
 
 The purpose of this script is to automate the bulk of writing ITL and C++
 annotations by hand.
+
+### Arguments
+
+`python cpp_itl_generator.py INPUT.cpp [additional arguments]`
+
+* `INPUT` : C++ file with CTL declarations
+* `--cpp` : Output C++ file with CTL stripped and replaced with function
+    declarations. Defaults to `out/INPUT.cpp`
+* `--itl`: Output ITL file. Defaults to `out/INPUT.itl`
+* `--wasm`: Oputput wasm file. This path is baked into the ITL file, so should
+    be overridden to match the core wasm module to be loaded. Defaults to
+    `out/INPUT.wasm`
 
 ## itl_iwasm_generator.py
 
