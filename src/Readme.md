@@ -32,10 +32,10 @@ annotations by hand.
 `python cpp_itl_generator.py INPUT.cpp [additional arguments]`
 
 * `INPUT` : C++ file with CTL declarations
-* `--cpp` : Output C++ file with CTL stripped and replaced with function
+* `--cpp FILE` : Output C++ file with CTL stripped and replaced with function
     declarations. Defaults to `out/INPUT.cpp`
-* `--itl`: Output ITL file. Defaults to `out/INPUT.itl`
-* `--wasm`: Oputput wasm file. This path is baked into the ITL file, so should
+* `--itl FILE`: Output ITL file. Defaults to `out/INPUT.itl`
+* `--wasm FILE`: Oputput wasm file. This path is baked into the ITL file, so should
     be overridden to match the core wasm module to be loaded. Defaults to
     `out/INPUT.wasm`
 

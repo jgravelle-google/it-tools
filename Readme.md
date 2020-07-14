@@ -3,6 +3,10 @@
 This repository serves as a collection of tools useful for prototyping code
 related to the WebAssembly Interface Types proposal.
 
+None of these tools are Production-ready, or have any stability guarantees
+whatsoever. The intention for these tools is to serve as a proof of concept,
+rather than a complete solution.
+
 Things to read:
 
 * [List of Tools](src/Readme.md) - summary of each tool in this repo

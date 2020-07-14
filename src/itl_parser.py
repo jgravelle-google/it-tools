@@ -102,6 +102,9 @@ def parse(body):
             lhs = parse_expr(sexpr[1])
             rhs = parse_expr(sexpr[2])
             return AddExpr(lhs, rhs)
+        elif head == 'unreachable':
+            assert(len(sexpr) == 1)
+            return UnreachableExpr()
         else:
             try:
                 n = int(head)

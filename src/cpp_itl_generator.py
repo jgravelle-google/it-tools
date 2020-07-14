@@ -190,6 +190,12 @@ def main():
         body = lift(func.ret, call)
         itl_contents += tab * 2 + body + '\n'
         itl_contents += tab + ')\n'
+    # builtin exports to polyfill for WASI functions added by Emscripten
+    itl_contents += (
+        '(func _it_proc_exit "proc_exit" (param i32) (result)\n'
+        '  (unreachable)\n'
+        ')\n'
+    )
     itl_contents += ')\n\n'
 
     # builtin helpers

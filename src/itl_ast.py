@@ -246,3 +246,9 @@ class IntExpr(BaseExpr):
         return str(self.val)
     def as_wat(self):
         return '(i32.const {})'.format(self.val)
+
+class UnreachableExpr(BaseExpr):
+    def as_js(self):
+        return 'throw "UNREACHABLE";'
+    def as_wat(self):
+        return '(unreachable)'
