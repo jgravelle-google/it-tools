@@ -20,7 +20,7 @@ without needing to wait for the full Interface Types proposal.
 Embind's API for calling JS from C++ is non-idiomatic C++. In particular it uses
 strings and dynamism in order to cover a wide surface area.
 
-## Background Info
+## Background : How Embind Works Today
 
 In order to successfully replace Embind, we first need to be able to match the
 set of features that it has on offer.
@@ -34,21 +34,38 @@ Embind's solution to using JS from C++ is straightforward, powerful, and
 problematic. The core element is the `emscripten::val` type, which wraps JS
 values for use in C++ code.
 
+This is powerful because it can use any(?) JS API that exists today. It is
+problematic because it uses strings to do so, which is essentially combining the
+problems with JS's `eval` with C++'s memory safety.
+
+This is interesting because we'll need to match this level of flexibility for
+users to feel like any successor API is strictly better.
+
 ### Calling C++ from JS
 
-EMSCRIPTEN_BINDINGS
+C++ functions/classes can be exposed to JS with the `EMSCRIPTEN_BINDINGS` macro.
+In that context there are special `function`, `class`, `method`, functions that
+describe C++ interfaces.
+
+Under the hood, the top-level macro defines a C++ class with a static initializer,
+that calls the initializer functions that the user specified (hence, the reason
+they use method chaining syntax). These static initializers are called before
+`main` is called, and they set up callbacks in Embind's runtime.
+
+There from JS these become methods added to the `Module` object, that are called
+with native JS types.
 
 ## Examples
 
 ### Hello World
 
-JS:
+Vanilla JS:
 ```js
 var hello = 'hello world!';
 console.log(hello);
 ```
 
-Embind:
+Embind C++:
 ```c++
 using emscripten;
 val console = val::global("console");
@@ -56,7 +73,7 @@ val hello = val("hello world!");
 console.call<void>("log", hello);
 ```
 
-Proposal:
+Proposed C++:
 ```c++
 #include "console.h"
 const char* hello = "hello world!";
