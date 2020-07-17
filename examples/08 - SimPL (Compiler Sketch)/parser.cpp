@@ -1,28 +1,28 @@
 /**IT_START**/
 
+type CallExpr = struct {
+    string callee;
+    string arg;
+};
+
 import "console" {
     func log(string);
 }
 export {
-    // type CallExpr = struct {
-    //     string callee;
-    //     string arg;
-    // };
-
-    // func parse(string) -> CallExpr;
+    func parse(string) -> CallExpr;
 }
 
 /**IT_END**/
 
 // temporary; what it should look like
-struct CallExpr {
-    const char* callee;
-    const char* arg;
-    CallExpr(const char* a, const char* b) {
-        callee = a;
-        arg = b;
-    }
-};
+// struct CallExpr {
+//     const char* callee;
+//     const char* arg;
+//     CallExpr(const char* a, const char* b) {
+//         callee = a;
+//         arg = b;
+//     }
+// };
 
 #include <string>
 

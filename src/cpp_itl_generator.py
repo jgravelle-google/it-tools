@@ -192,9 +192,9 @@ def main():
         itl_contents += tab + ')\n'
     # builtin exports to polyfill for WASI functions added by Emscripten
     itl_contents += (
-        '(func _it_proc_exit "proc_exit" (param i32) (result)\n'
-        '  (unreachable)\n'
-        ')\n'
+        '    (func _it_proc_exit "proc_exit" (param i32) (result)\n'
+        '        (unreachable)\n'
+        '    )\n'
     )
     itl_contents += ')\n\n'
 
@@ -310,10 +310,7 @@ class Parser(object):
             elif head == 'type':
                 name = self.pop()
                 self.expect('=')
-                # TODO: currently assume types are all imports
-                self.expect('import')
-                import_name, funcs = self.parse_import()
-                types[name] = Type(name, import_name, funcs)
+                types[name] = self.parse_type()
             else:
                 assert False, 'unknown top-level stmt'
         return AST(imports, exports, types)
@@ -348,6 +345,14 @@ class Parser(object):
             ret = 'void'
         self.expect(';')
         return Func(name, args, ret)
+
+    def parse_type(self):
+        # TODO: currently assume types are all imports
+        kind = self.pop()
+        if kind == 'import':
+            import_name, funcs = self.parse_import()
+            return Type(name, import_name, funcs)
+        assert False, 'unknown type: ' + kind
 
     # Helper funcs
     def peek(self):

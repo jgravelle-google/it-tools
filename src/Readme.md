@@ -2,13 +2,7 @@
 
 These are the tools, and a brief discussion of what they do.
 
-## itl_parser.py
-
-Parser for the ITL format. ITL is a domain-specific language (DSL) that is
-intended to map nearly identically to the Interface Types (IT) text format.
-
-This script is a common base for parsing the format, and is intended to be used
-by other tools in this repo.
+Tools marked with "**Under Construction**" are not functional yet.
 
 ## adapter.py
 
@@ -39,7 +33,17 @@ annotations by hand.
     be overridden to match the core wasm module to be loaded. Defaults to
     `out/INPUT.wasm`
 
+## itl_parser.py
+
+Parser for the ITL format. ITL is a domain-specific language (DSL) that is
+intended to map nearly identically to the Interface Types (IT) text format.
+
+This script is a common base for parsing the format, and is intended to be used
+by other tools in this repo.
+
 ## itl_iwasm_generator.py
+
+**Under Construction**
 
 Generates an .iwasm module from an .itl file.
 
