@@ -1,14 +1,14 @@
 /**IT_START**/
 
-type CallExpr = struct {
-    string callee;
-    string arg;
-};
-
 import "console" {
     func log(string);
 }
 export {
+    type CallExpr = struct {
+        string callee;
+        string arg;
+    }
+
     func parse(string) -> CallExpr;
 }
 

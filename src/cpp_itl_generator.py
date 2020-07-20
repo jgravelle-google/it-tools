@@ -70,7 +70,7 @@ def main():
             'string': 'const char*',
             'void': 'void',
         }
-        return mapping[ty]
+        return mapping.get(ty, ty)
     def it_to_cpp_func(func):
         ret_ty = it_to_cpp_ty(func.ret)
         arg_tys = [it_to_cpp_ty(arg) for arg in func.args]
@@ -139,7 +139,8 @@ def main():
             return '(call _it_cppToString {})'.format(expr)
         elif ty == 'void':
             return expr
-        assert False, 'unknown lifting type: ' + ty
+        assert ty in ast.types, 'unknown lifting type: ' + ty
+        return '(make-struct {})'.format(ty)
     def lower(ty, expr):
         if ty in integer_types:
             return '(as i32 {})'.format(expr)
@@ -236,11 +237,10 @@ class Func(object):
         self.name = name
         self.args = args
         self.ret = ret
-class Type(object):
-    def __init__(self, name, import_name, funcs):
+class Struct(object):
+    def __init__(self, name, fields):
         self.name = name
-        self.import_name = import_name
-        self.funcs = funcs
+        self.fields = fields
 
 def parse_it(contents):
     tokens = Lexer(contents).lex()
@@ -301,16 +301,15 @@ class Parser(object):
                 while True:
                     if self.peek() == 'func':
                         exports.append(self.parse_func())
+                    elif self.peek() == 'type':
+                        ty = self.parse_type()
+                        types[ty.name] = ty
                     else:
                         self.expect('}')
                         break
             elif head == 'import':
                 name, funcs = self.parse_import()
                 imports[name] = funcs
-            elif head == 'type':
-                name = self.pop()
-                self.expect('=')
-                types[name] = self.parse_type()
             else:
                 assert False, 'unknown top-level stmt'
         return AST(imports, exports, types)
@@ -346,12 +345,28 @@ class Parser(object):
         self.expect(';')
         return Func(name, args, ret)
 
+
+    # type CallExpr = struct {
+    #     string callee;
+    #     string arg;
+    # };
     def parse_type(self):
-        # TODO: currently assume types are all imports
+        self.expect('type')
+        name = self.pop()
+        self.expect('=')
         kind = self.pop()
-        if kind == 'import':
-            import_name, funcs = self.parse_import()
-            return Type(name, import_name, funcs)
+        if kind == 'struct':
+            self.expect('{')
+            body = self.until('}')
+            i = 0
+            fields = []
+            while i < len(body):
+                ty = body[i]
+                field_name = body[i+1]
+                assert body[i+2] == ';'
+                i += 3
+                fields.append((ty, field_name))
+            return Struct(name, fields)
         assert False, 'unknown type: ' + kind
 
     # Helper funcs

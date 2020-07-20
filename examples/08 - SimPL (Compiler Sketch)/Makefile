@@ -1,8 +1,12 @@
+build: out out/parser.wasm
+
+clean: out
+	rm -r out/
+.PHONY: clean
+
 serve: build
 	emrun --no_browser --port 8080 .
 .PHONY: serve
-
-build: out out/parser.wasm
 
 out:
 	mkdir -p out
