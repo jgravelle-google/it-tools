@@ -36,6 +36,7 @@ def update_times():
                 cachename = watchpath + ':' + filename
                 mtime = os.path.getmtime(filename)
                 if times.get(cachename) != mtime:
+                    print '>> UPDATED', cachename
                     updated = True
                 times[cachename] = mtime
     return updated

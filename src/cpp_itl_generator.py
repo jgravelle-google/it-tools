@@ -109,6 +109,15 @@ def main():
     tab = '    '
     itl_contents = ''
 
+    # ITL Types
+    itl_contents += '(types\n'
+    for struct in ast.types.values():
+        itl_contents += tab + '(record {}\n'.format(struct.name)
+        for name, ty in struct.fields:
+            itl_contents += tab * 2 + '({} {})\n'.format(name, ty)
+        itl_contents += tab + ')\n'
+    itl_contents += ')\n'
+
     # ITL Imports
     def it_to_wasm_ty(ty):
         if ty == 'void':
@@ -139,8 +148,9 @@ def main():
             return '(call _it_cppToString {})'.format(expr)
         elif ty == 'void':
             return expr
-        assert ty in ast.types, 'unknown lifting type: ' + ty
-        return '(make-struct {})'.format(ty)
+        struct = ast.types.get(ty)
+        assert struct, 'unknown lifting type: ' + ty
+        return '(make-record {})'.format(ty)
     def lower(ty, expr):
         if ty in integer_types:
             return '(as i32 {})'.format(expr)
@@ -152,6 +162,7 @@ def main():
         elif ty == 'void':
             return expr
         assert False, 'unknown lowering type: ' + ty
+    # declare imports on the core module
     itl_contents += '\n(module wasm "{}"\n'.format(wasm_out)
     for imp, funcs in ast.imports.iteritems():
         itl_contents += tab + '(import "{}"\n'.format(imp)
@@ -168,6 +179,7 @@ def main():
             body = lower(func.ret, call)
             itl_contents += tab * 3 + body + ')\n'
         itl_contents += tab + ')\n'
+    # C++ runtime builtin declarations
     builtins = [
         Func('malloc', ['string'], 's32'),
         Func('_it_strlen', ['string'], 's32'),
@@ -191,7 +203,7 @@ def main():
         body = lift(func.ret, call)
         itl_contents += tab * 2 + body + '\n'
         itl_contents += tab + ')\n'
-    # builtin exports to polyfill for WASI functions added by Emscripten
+    # builtin exports to polyfill for WASI imports added by Emscripten
     itl_contents += (
         '    (func _it_proc_exit "proc_exit" (param i32) (result)\n'
         '        (unreachable)\n'
@@ -346,10 +358,6 @@ class Parser(object):
         return Func(name, args, ret)
 
 
-    # type CallExpr = struct {
-    #     string callee;
-    #     string arg;
-    # };
     def parse_type(self):
         self.expect('type')
         name = self.pop()

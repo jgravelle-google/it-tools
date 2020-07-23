@@ -102,6 +102,8 @@ def parse(body):
             lhs = parse_expr(sexpr[1])
             rhs = parse_expr(sexpr[2])
             return AddExpr(lhs, rhs)
+        elif head == 'make-record':
+            return UnreachableExpr()
         elif head == 'unreachable':
             assert(len(sexpr) == 1)
             return UnreachableExpr()
@@ -164,6 +166,8 @@ def parse(body):
             func = parse_func(group, ['component'])
             component.funcs.append(func)
             component.add_func(func)
+        elif group[0] == 'types':
+            pass
 
     # post-initialize now that AST is fully built
     for func in component.all_funcs_iter():

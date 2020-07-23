@@ -43,11 +43,9 @@ def ensure_path(path):
 def write_wat_module(component):
     # TODO: emit real wasm, not wat
     def it_to_wat_ty(ty):
-        if ty == 'string':
-            return 'externref'
-        elif ty in ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']:
+        if ty in ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32', 'i32']:
             return 'i32'
-        return ty
+        return 'externref'
     def func_ty(func):
         params = '(param {})'.format(' '.join(it_to_wat_ty(p) for p in func.params))
         results = '(result {})'.format(' '.join(it_to_wat_ty(r) for r in func.results))
