@@ -1,3 +1,13 @@
+// temporary; what it should look like
+struct CallExpr {
+    const char* callee;
+    const char* arg;
+    CallExpr(const char* a, const char* b) {
+        callee = a;
+        arg = b;
+    }
+};
+
 /**IT_START**/
 
 import "console" {
@@ -13,16 +23,6 @@ export {
 }
 
 /**IT_END**/
-
-// temporary; what it should look like
-// struct CallExpr {
-//     const char* callee;
-//     const char* arg;
-//     CallExpr(const char* a, const char* b) {
-//         callee = a;
-//         arg = b;
-//     }
-// };
 
 #include <string>
 

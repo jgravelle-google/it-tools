@@ -164,6 +164,14 @@ def main():
         assert False, 'unknown lowering type: ' + ty
     # declare imports on the core module
     itl_contents += '\n(module wasm "{}"\n'.format(wasm_out)
+    # builtin exports to polyfill for WASI imports added by Emscripten
+    itl_contents += (
+        '    (import "wasi_snapshot_preview1"\n'
+        '       (func _it_proc_exit "proc_exit" (param i32) (result)\n'
+        '           (unreachable)\n'
+        '       )\n'
+        '    )\n'
+    )
     for imp, funcs in ast.imports.iteritems():
         itl_contents += tab + '(import "{}"\n'.format(imp)
         for func in funcs:
@@ -203,12 +211,6 @@ def main():
         body = lift(func.ret, call)
         itl_contents += tab * 2 + body + '\n'
         itl_contents += tab + ')\n'
-    # builtin exports to polyfill for WASI imports added by Emscripten
-    itl_contents += (
-        '    (func _it_proc_exit "proc_exit" (param i32) (result)\n'
-        '        (unreachable)\n'
-        '    )\n'
-    )
     itl_contents += ')\n\n'
 
     # builtin helpers

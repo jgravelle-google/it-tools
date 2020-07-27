@@ -249,6 +249,6 @@ class IntExpr(BaseExpr):
 
 class UnreachableExpr(BaseExpr):
     def as_js(self):
-        return 'throw "UNREACHABLE";'
+        return '(function() { throw "UNREACHABLE"; })()'
     def as_wat(self):
         return '(unreachable)'
