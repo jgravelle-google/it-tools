@@ -96,6 +96,9 @@ def write_js_module(component):
                 load_modules += function(func, n_indent=4)
             load_modules += tab * 3 + '},\n'
         load_modules += tab * 2 + '});\n'
+        # call any static constructors
+        # TODO: configure this; have a start function in ITL to call these
+        load_modules += tab * 2 + '{}._initialize();\n'.format(name)
     js_str = js_str.replace('/**MODULE_NAMES**/', module_names)
     js_str = js_str.replace('/**LOAD_MODULES**/', load_modules)
 
