@@ -69,6 +69,7 @@ def main():
             'f64': 'double',
             'string': 'const char*',
             'void': 'void',
+            'buffer': 'ITBuffer',
         }
         return mapping.get(ty, ty)
     def it_to_cpp_func(func):
@@ -146,6 +147,8 @@ def main():
             return '(as {} {})'.format(ty, expr)
         elif ty == 'string':
             return '(call _it_cppToString {})'.format(expr)
+        elif ty == 'buffer':
+            return '(call _it_cppToBuffer  {})'.format(expr)
         elif ty == 'void':
             return expr
         struct = ast.types.get(ty)
@@ -235,6 +238,14 @@ def main():
         (local 1) ;; len
     )
     (local 2) ;; ptr
+)
+
+(func _it_cppToBuffer "" (param i32) (result buffer)
+    ;; helper function to convert buffer from struct to buffer
+    (mem-to-buffer wasm "memory"
+        (load u32 wasm "memory" (+ (local 0) 4))
+        (load u32 wasm "memory" (local 0))
+    )
 )
 
 '''

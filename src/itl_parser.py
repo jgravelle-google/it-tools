@@ -97,6 +97,20 @@ def parse(body):
             assert(len(sexpr) == 2)
             string = parse_expr(sexpr[1])
             return StringLenExpr(string)
+        elif head == 'mem-to-buffer':
+            assert(len(sexpr) == 5)
+            mod = sexpr[1]
+            mem = unquote(sexpr[2])
+            ptr = parse_expr(sexpr[3])
+            length = parse_expr(sexpr[4])
+            return MemToBufferExpr(mod, mem, ptr, length)
+        elif head == 'load':
+            assert len(sexpr) == 5
+            ty = sexpr[1]
+            mod = sexpr[2]
+            mem = unquote(sexpr[3])
+            ptr = parse_expr(sexpr[4])
+            return LoadExpr(ty, mod, mem, ptr)
         elif head == '+':
             assert(len(sexpr) == 3)
             lhs = parse_expr(sexpr[1])

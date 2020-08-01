@@ -14,7 +14,7 @@ const /**COMPONENT_NAME**/ = {
         function memToString(memory, ptr, len) {
             let u8 = new Uint8Array(memory.buffer);
             let str = '';
-            for (var i = 0; i < len; ++i) {
+            for (let i = 0; i < len; ++i) {
                 str += String.fromCharCode(u8[ptr + i]);
             }
             return str;
@@ -22,10 +22,16 @@ const /**COMPONENT_NAME**/ = {
         function stringToMem(memory, str, ptr) {
             let u8 = new Uint8Array(memory.buffer);
             let len = str.length;
-            for (var i = 0; i < len; ++i) {
+            for (let i = 0; i < len; ++i) {
                 u8[ptr + i] = str.charCodeAt(i);
             }
             return len;
+        }
+        function memToBuffer(memory, ptr, len) {
+            return memory.buffer.slice(ptr, ptr + len);
+        }
+        function bufferToMem(memory, buffer, ptr) {
+            throw 'TODO: bufferToMem';
         }
 
 /**COMPONENT_FUNCTIONS**/

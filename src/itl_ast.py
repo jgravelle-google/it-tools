@@ -225,6 +225,49 @@ class StringLenExpr(BaseExpr):
     def as_wat(self):
         return '(call $_it_string_len {})'.format(self.expr.as_wat())
 
+class LoadExpr(BaseExpr):
+    def __init__(self, load_ty, module, memory, ptr):
+        self.load_ty = load_ty
+        self.module = module
+        self.memory = memory
+        self.ptr = ptr
+
+    def ty(self):
+        return self.load_ty
+
+    def as_js(self):
+        assert self.load_ty == 'u32'
+        return '(new Uint32Array({}["{}"].buffer))[{} >> 2]'.format(
+            self.module, self.memory, self.ptr.as_js())
+
+class MemToBufferExpr(BaseExpr):
+    def __init__(self, module, memory, ptr, length):
+        self.module = module
+        self.memory = memory
+        self.ptr = ptr
+        self.length = length
+
+    def children(self):
+        return [self.ptr, self.length]
+
+    def as_js(self):
+        return 'memToBuffer({}["{}"], {}, {})'.format(
+            self.module, self.memory, self.ptr.as_js(), self.length.as_js())
+
+class BufferToMemExpr(BaseExpr):
+    def __init__(self, module, memory, string, ptr):
+        self.module = module
+        self.memory = memory
+        self.string = string
+        self.ptr = ptr
+
+    def children(self):
+        return [self.string, self.ptr]
+
+    def as_js(self):
+        return 'bufferToMem({}["{}"], {}, {})'.format(
+            self.module, self.memory, self.string.as_js(), self.ptr.as_js())
+
 class AddExpr(BaseExpr):
     def __init__(self, lhs, rhs):
         self.lhs = lhs
