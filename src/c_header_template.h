@@ -10,22 +10,31 @@ public:
     ITBuffer(int n, void* d) : size(n), data(d) {}
 };
 
-template <typename T, int N>
+// Variable sized buffer
+template <typename T>
 class Buffer {
+    int size;
     T* data;
 public:
-    Buffer() : data(new T[N * sizeof(T)]) {}
+    Buffer(int n) : size(n), data(new T[n * sizeof(T)]) {}
     ~Buffer() {
         delete[] data;
     }
 
-    T& operator[](int idx) {
+    inline T& operator[](int idx) {
         return data[idx];
     }
 
-    operator ITBuffer() const {
-        return ITBuffer(N * sizeof(T), data);
+    inline operator ITBuffer() const {
+        return ITBuffer(size * sizeof(T), data);
     }
+};
+
+// Fixed-size buffer
+template <typename T, int N>
+class FixedBuffer : public Buffer<T> {
+public:
+    FixedBuffer() : Buffer<T>(N) {}
 };
 
 // Imports

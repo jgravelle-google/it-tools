@@ -22,10 +22,10 @@ itl_path = args.itl_in
 itl_filename = os.path.basename(itl_path)
 basename, _ = os.path.splitext(itl_filename)
 if args.js_out:
-    js_path = args.js_out
-    outpath = os.path.basename(js_path)
+    js_path = os.path.abspath(args.js_out)
+    outpath = os.path.dirname(js_path)
 else:
-    outpath = 'out'
+    outpath = os.path.abspath('out')
     js_path = os.path.join(outpath, basename + '.js')
 if args.component_name:
     component_name = args.component_name
@@ -90,7 +90,7 @@ def write_js_module(component):
         path = mod.path
         module_names += tab * 2 + 'let {};\n'.format(name)
         load_modules += tab * 2 + '{} = await loadModule("{}", {{\n'.format(name, path)
-        for imp, funcs in mod.imports.iteritems():
+        for imp, funcs in mod.imports.items():
             load_modules += tab * 3 + imp + ': {\n'
             for func in funcs:
                 load_modules += function(func, n_indent=4)
@@ -119,5 +119,5 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         trace = traceback.format_exc(e)
-        print trace
+        print(trace)
         sys.exit(1)

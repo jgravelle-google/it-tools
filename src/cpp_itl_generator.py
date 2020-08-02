@@ -78,7 +78,7 @@ def main():
         arg_str = ', '.join(arg_tys)
         return '{} {}({});\n'.format(ret_ty, func.name, arg_str)
     import_decls = ''
-    for imp, funcs in ast.imports.iteritems():
+    for imp, funcs in ast.imports.items():
         for func in funcs:
             attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.name)
             import_decls += attr + ' ' + it_to_cpp_func(func)
@@ -87,8 +87,8 @@ def main():
     for func in ast.exports:
         attr = '__attribute__((export_name("{}")))'.format(func.name)
         export_decls += attr + ' ' + it_to_cpp_func(func)
-    for ty, funcs in ast.types.iteritems():
-        print 'TYPES', ty
+    for ty, funcs in ast.types.items():
+        print('TYPES', ty)
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
 
     #############################################
@@ -129,7 +129,7 @@ def main():
         ret = it_to_wasm_ty(func.ret) if func.ret != 'void' else ''
         return '(func {} "{}" (param {}) (result {}))'.format(
             func.name, func.name, ' '.join(args), ret)
-    for imp, funcs in ast.imports.iteritems():
+    for imp, funcs in ast.imports.items():
         itl_contents += '(import "{}"\n'.format(imp)
         for func in funcs:
             ret = func.ret if func.ret != 'void' else ''
@@ -175,7 +175,7 @@ def main():
         '       )\n'
         '    )\n'
     )
-    for imp, funcs in ast.imports.iteritems():
+    for imp, funcs in ast.imports.items():
         itl_contents += tab + '(import "{}"\n'.format(imp)
         for func in funcs:
             args = ' '.join(it_to_wasm_ty(arg) for arg in func.args)
@@ -427,5 +427,5 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         trace = traceback.format_exc(e)
-        print trace
+        print(trace)
         sys.exit(1)

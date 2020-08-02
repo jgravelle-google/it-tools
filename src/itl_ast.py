@@ -17,7 +17,7 @@ class Component(object):
         self.all_funcs[func.name] = func
 
     def all_funcs_iter(self):
-        for func in self.all_funcs.itervalues():
+        for func in self.all_funcs.values():
             yield func
 
     def wat_string(self, val):
