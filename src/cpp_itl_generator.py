@@ -69,7 +69,7 @@ def main():
             'f64': 'double',
             'string': 'const char*',
             'void': 'void',
-            'buffer': 'ITBuffer',
+            'buffer': 'ITBuffer*',
         }
         return mapping.get(ty, ty)
     def it_to_cpp_func(func):
@@ -162,6 +162,8 @@ def main():
             return '(as {} {})'.format(ty, expr)
         elif ty == 'string':
             return '(call _it_stringToCpp {})'.format(expr)
+        elif ty == 'buffer':
+            return '(call _it_bufferToCpp {})'.format(expr)
         elif ty == 'void':
             return expr
         assert False, 'unknown lowering type: ' + ty
@@ -192,7 +194,7 @@ def main():
         itl_contents += tab + ')\n'
     # C++ runtime builtin declarations
     builtins = [
-        Func('malloc', ['string'], 's32'),
+        Func('_it_malloc', ['string'], 's32'),
         Func('_it_strlen', ['string'], 's32'),
         Func('_it_writeStringTerm', ['string', 's32'], 'void'),
     ]
@@ -228,7 +230,7 @@ def main():
 (func _it_stringToCpp "" (param string) (result i32)
     ;; helper function to convert strings as a unary expression
     (let (string-len (local 0)))
-    (let (call malloc (+ (local 1) 1)))
+    (let (call _it_malloc (+ (local 1) 1)))
     (string-to-mem wasm "memory"
         (local 0) ;; str
         (local 2) ;; ptr
@@ -246,6 +248,26 @@ def main():
         (load u32 wasm "memory" (+ (local 0) 4))
         (load u32 wasm "memory" (local 0))
     )
+)
+(func _it_bufferToCpp "" (param buffer) (result i32)
+    ;; helper function to convert buffers as a unary expression
+    (let (buffer-len (local 0)))
+
+    ;; allocate a C++ buffer, write bytes into it
+    (let (call _it_malloc (local 1)))
+    (buffer-to-mem wasm "memory"
+        (local 0) ;; buff
+        (local 2) ;; ptr
+    )
+
+    ;; allocate C++ Buffer struct
+    (let (call _it_malloc 8))
+    ;; store len
+    (store u32 wasm "memory" (local 3) (local 1))
+    ;; store ptr value
+    (store u32 wasm "memory" (+ 4 (local 3)) (local 2))
+    ;; return
+    (local 3)
 )
 
 '''

@@ -97,6 +97,10 @@ def parse(body):
             assert(len(sexpr) == 2)
             string = parse_expr(sexpr[1])
             return StringLenExpr(string)
+        elif head == 'buffer-len':
+            assert(len(sexpr) == 2)
+            buff = parse_expr(sexpr[1])
+            return BufferLenExpr(buff)
         elif head == 'mem-to-buffer':
             assert(len(sexpr) == 5)
             mod = sexpr[1]
@@ -104,6 +108,13 @@ def parse(body):
             ptr = parse_expr(sexpr[3])
             length = parse_expr(sexpr[4])
             return MemToBufferExpr(mod, mem, ptr, length)
+        elif head == 'buffer-to-mem':
+            assert(len(sexpr) == 5)
+            mod = sexpr[1]
+            mem = unquote(sexpr[2])
+            buff = parse_expr(sexpr[3])
+            ptr = parse_expr(sexpr[4])
+            return BufferToMemExpr(mod, mem, buff, ptr)
         elif head == 'load':
             assert len(sexpr) == 5
             ty = sexpr[1]
@@ -111,6 +122,14 @@ def parse(body):
             mem = unquote(sexpr[3])
             ptr = parse_expr(sexpr[4])
             return LoadExpr(ty, mod, mem, ptr)
+        elif head == 'store':
+            assert len(sexpr) == 6
+            ty = sexpr[1]
+            mod = sexpr[2]
+            mem = unquote(sexpr[3])
+            ptr = parse_expr(sexpr[4])
+            expr = parse_expr(sexpr[5])
+            return StoreExpr(ty, mod, mem, ptr, expr)
         elif head == '+':
             assert(len(sexpr) == 3)
             lhs = parse_expr(sexpr[1])
@@ -123,7 +142,7 @@ def parse(body):
             return UnreachableExpr()
         else:
             try:
-                n = int(head)
+                n = int(sexpr)
                 return IntExpr(n)
             except:
                 pass

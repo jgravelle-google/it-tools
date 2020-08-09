@@ -240,6 +240,34 @@ class LoadExpr(BaseExpr):
         return '(new Uint32Array({}["{}"].buffer))[{} >> 2]'.format(
             self.module, self.memory, self.ptr.as_js())
 
+class StoreExpr(BaseExpr):
+    def __init__(self, store_ty, module, memory, ptr, expr):
+        self.store_ty = store_ty
+        self.module = module
+        self.memory = memory
+        self.ptr = ptr
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+
+    def as_js(self):
+        assert self.store_ty == 'u32'
+        return '(new Uint32Array({}["{}"].buffer))[{} >> 2] = {}'.format(
+            self.module, self.memory, self.ptr.as_js(), self.expr.as_js())
+
+class BufferLenExpr(BaseExpr):
+    def __init__(self, expr):
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+    def ty(self):
+        return 's32'
+
+    def as_js(self):
+        return '(new Uint8Array({})).length'.format(self.expr.as_js())
+
 class MemToBufferExpr(BaseExpr):
     def __init__(self, module, memory, ptr, length):
         self.module = module
@@ -255,18 +283,18 @@ class MemToBufferExpr(BaseExpr):
             self.module, self.memory, self.ptr.as_js(), self.length.as_js())
 
 class BufferToMemExpr(BaseExpr):
-    def __init__(self, module, memory, string, ptr):
+    def __init__(self, module, memory, buff, ptr):
         self.module = module
         self.memory = memory
-        self.string = string
+        self.buff = buff
         self.ptr = ptr
 
     def children(self):
-        return [self.string, self.ptr]
+        return [self.buff, self.ptr]
 
     def as_js(self):
         return 'bufferToMem({}["{}"], {}, {})'.format(
-            self.module, self.memory, self.string.as_js(), self.ptr.as_js())
+            self.module, self.memory, self.buff.as_js(), self.ptr.as_js())
 
 class AddExpr(BaseExpr):
     def __init__(self, lhs, rhs):
