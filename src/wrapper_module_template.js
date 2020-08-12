@@ -31,7 +31,6 @@ const /**COMPONENT_NAME**/ = {
             return memory.buffer.slice(ptr, ptr + len);
         }
         function bufferToMem(memory, buffer, ptr) {
-            console.log('bufferToMem', memory, buffer, ptr);
             let u8 = new Uint8Array(memory.buffer);
             let b8 = new Uint8Array(buffer);
             u8.set(b8, ptr);

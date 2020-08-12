@@ -56,25 +56,9 @@ def main():
     # Write compute import+export declarations
     template_path = os.path.join(srcpath, 'c_header_template.h')
     h_contents = open(template_path).read()
-    def it_to_cpp_ty(ty):
-        mapping = {
-            'u1': 'bool',
-            's8': 'char',
-            'u8': 'unsigned char',
-            's16': 'short',
-            'u16': 'unsigned short',
-            's32': 'int',
-            'u32': 'unsigned int',
-            'f32': 'float',
-            'f64': 'double',
-            'string': 'const char*',
-            'void': 'void',
-            'buffer': 'ITBuffer*',
-        }
-        return mapping.get(ty, ty)
     def it_to_cpp_func(func):
-        ret_ty = it_to_cpp_ty(func.ret)
-        arg_tys = [it_to_cpp_ty(arg) for arg in func.args]
+        ret_ty = func.ret.to_cpp()
+        arg_tys = [arg.to_cpp() for arg in func.args]
         arg_str = ', '.join(arg_tys)
         return '{} {}({});\n'.format(ret_ty, func.name, arg_str)
     import_decls = ''
@@ -120,21 +104,18 @@ def main():
     itl_contents += ')\n'
 
     # ITL Imports
-    def it_to_wasm_ty(ty):
-        if ty == 'void':
-            return ''
-        return 'i32'
     def it_to_wasm_func(func):
-        args = [it_to_wasm_ty(ty) for ty in func.args]
-        ret = it_to_wasm_ty(func.ret) if func.ret != 'void' else ''
+        args = [ty.to_wasm() for ty in func.args]
+        ret = func.ret.to_wasm()
         return '(func {} "{}" (param {}) (result {}))'.format(
             func.name, func.name, ' '.join(args), ret)
     for imp, funcs in ast.imports.items():
         itl_contents += '(import "{}"\n'.format(imp)
         for func in funcs:
-            ret = func.ret if func.ret != 'void' else ''
+            args = [ty.to_it() for ty in func.args]
+            ret = func.ret.to_it()
             itl_contents += tab + '(func {} "{}" (param {}) (result {}))\n'.format(
-                func.name, func.name, ' '.join(func.args), ret)
+                func.name, func.name, ' '.join(args), ret)
         itl_contents += ')\n'
 
     # Wasm module
@@ -143,30 +124,31 @@ def main():
     numeric_types = integer_types + float_types
     def lift(ty, expr):
         # C++ -> IT
-        if ty in numeric_types:
-            return '(as {} {})'.format(ty, expr)
-        elif ty == 'string':
+        if ty.ty in numeric_types:
+            return '(as {} {})'.format(ty.ty, expr)
+        elif ty.ty == 'string':
             return '(call _it_cppToString {})'.format(expr)
-        elif ty == 'buffer':
+        elif ty.ty == 'buffer':
             return '(call _it_cppToBuffer  {})'.format(expr)
-        elif ty == 'void':
+        elif ty.ty == 'void':
             return expr
-        struct = ast.types.get(ty)
-        assert struct, 'unknown lifting type: ' + ty
-        return '(make-record {})'.format(ty)
+        struct = ast.types.get(ty.ty)
+        assert struct, 'unknown lifting type: ' + ty.ty
+        return '(make-record {})'.format(ty.ty)
     def lower(ty, expr):
-        if ty in integer_types:
+        if ty.ty in integer_types:
+            # TODO: handle 64bit ints
             return '(as i32 {})'.format(expr)
-        elif ty in float_types:
+        elif ty.ty in float_types:
             # currently all float types happen to match core wasm
-            return '(as {} {})'.format(ty, expr)
-        elif ty == 'string':
+            return '(as {} {})'.format(ty.ty, expr)
+        elif ty.ty == 'string':
             return '(call _it_stringToCpp {})'.format(expr)
-        elif ty == 'buffer':
+        elif ty.ty == 'buffer':
             return '(call _it_bufferToCpp {})'.format(expr)
-        elif ty == 'void':
+        elif ty.ty == 'void':
             return expr
-        assert False, 'unknown lowering type: ' + ty
+        assert False, 'unknown lowering type: ' + ty.ty
     # declare imports on the core module
     itl_contents += '\n(module wasm "{}"\n'.format(wasm_out)
     # builtin exports to polyfill for WASI imports added by Emscripten
@@ -180,8 +162,8 @@ def main():
     for imp, funcs in ast.imports.items():
         itl_contents += tab + '(import "{}"\n'.format(imp)
         for func in funcs:
-            args = ' '.join(it_to_wasm_ty(arg) for arg in func.args)
-            ret = it_to_wasm_ty(func.ret) if func.ret != 'void' else ''
+            args = ' '.join(arg.to_wasm() for arg in func.args)
+            ret = func.ret.to_wasm() if func.ret != 'void' else ''
             itl_contents += tab * 2 + '(func _it_{} "{}" (param {}) (result {})\n'.format(
                 func.name, func.name, args, ret)
             args = ''
@@ -193,10 +175,12 @@ def main():
             itl_contents += tab * 3 + body + ')\n'
         itl_contents += tab + ')\n'
     # C++ runtime builtin declarations
+    def builtin(name, args, ret):
+        return Func(name, [Type(arg) for arg in args], Type(ret))
     builtins = [
-        Func('_it_malloc', ['string'], 's32'),
-        Func('_it_strlen', ['string'], 's32'),
-        Func('_it_writeStringTerm', ['string', 's32'], 'void'),
+        builtin('_it_malloc', ['string'], 's32'),
+        builtin('_it_strlen', ['string'], 's32'),
+        builtin('_it_writeStringTerm', ['string', 's32'], 'void'),
     ]
     for func in ast.exports + builtins:
         itl_contents += tab + it_to_wasm_func(func) + '\n'
@@ -207,7 +191,7 @@ def main():
     for func in ast.exports:
         ret = func.ret if func.ret != 'void' else ''
         itl_contents += tab + '(func _it_{} "{}" (param {}) (result {})\n'.format(
-            func.name, func.name, ' '.join(func.args), ret)
+            func.name, func.name, ' '.join([ty.to_it() for ty in func.args]), ret)
         args = ''
         for i, arg in enumerate(func.args):
             local = '(local {})'.format(i)
@@ -288,6 +272,34 @@ class Struct(object):
     def __init__(self, name, fields):
         self.name = name
         self.fields = fields
+class Type(object):
+    def __init__(self, ty):
+        self.ty = ty
+
+    def to_it(self):
+        if self.ty == 'void':
+            return ''
+        return self.ty
+    def to_cpp(self):
+        mapping = {
+            'u1': 'bool',
+            's8': 'char',
+            'u8': 'unsigned char',
+            's16': 'short',
+            'u16': 'unsigned short',
+            's32': 'int',
+            'u32': 'unsigned int',
+            'f32': 'float',
+            'f64': 'double',
+            'string': 'const char*',
+            'void': 'void',
+            'buffer': 'ITBuffer*',
+        }
+        return mapping[self.ty]
+    def to_wasm(self):
+        if self.ty == 'void':
+            return ''
+        return 'i32'
 
 def parse_it(contents):
     tokens = Lexer(contents).lex()
@@ -349,7 +361,7 @@ class Parser(object):
                     if self.peek() == 'func':
                         exports.append(self.parse_func())
                     elif self.peek() == 'type':
-                        ty = self.parse_type()
+                        ty = self.parse_type_decl()
                         types[ty.name] = ty
                     else:
                         self.expect('}')
@@ -378,22 +390,24 @@ class Parser(object):
         name = self.pop()
         self.expect('(')
 
-        args = self.until(')')
-        if len(args):
-            # validate comma-separated arguments
-            assert len(args) % 2 == 1, 'unbalanced commas and args : ' + str(args)
-            args, commas = args[::2], args[1::2]
-            assert all(x == ',' for x in commas), 'args must be comma-separated : ' + str(args)
+        args = []
+        while self.peek() != ')':
+            args.append(self.parse_type())
+            if self.peek() != ')':
+                self.expect(',')
+        self.expect(')')
 
         if self.check('->'):
-            ret = self.pop()
+            ret = self.parse_type()
         else:
-            ret = 'void'
+            ret = Type('void')
         self.expect(';')
         return Func(name, args, ret)
 
-
     def parse_type(self):
+        return Type(self.pop())
+
+    def parse_type_decl(self):
         self.expect('type')
         name = self.pop()
         self.expect('=')
