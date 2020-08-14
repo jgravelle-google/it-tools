@@ -7,6 +7,8 @@ import os
 import sys
 import traceback
 
+tab = '    '
+
 def main():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('cpp_in', help='C++ file with CTL declarations')
@@ -56,21 +58,16 @@ def main():
     # Write compute import+export declarations
     template_path = os.path.join(srcpath, 'c_header_template.h')
     h_contents = open(template_path).read()
-    def it_to_cpp_func(func):
-        ret_ty = func.ret.to_cpp()
-        arg_tys = [arg.to_cpp() for arg in func.args]
-        arg_str = ', '.join(arg_tys)
-        return '{} {}({});\n'.format(ret_ty, func.name, arg_str)
     import_decls = ''
     for imp, funcs in ast.imports.items():
         for func in funcs:
             attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.name)
-            import_decls += attr + ' ' + it_to_cpp_func(func)
+            import_decls += attr + ' ' + func.to_cpp()
     h_contents = h_contents.replace('/**IMPORT_DECLS**/', import_decls)
     export_decls = ''
     for func in ast.exports:
         attr = '__attribute__((export_name("{}")))'.format(func.name)
-        export_decls += attr + ' ' + it_to_cpp_func(func)
+        export_decls += attr + ' ' + func.to_cpp()
     for ty, funcs in ast.types.items():
         print('TYPES', ty)
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
@@ -91,7 +88,6 @@ def main():
 
     # Write .itl file
     # TODO: extract this AST -> ITL logic to an ItlWriter class
-    tab = '    '
     itl_contents = ''
 
     # ITL Types
@@ -104,51 +100,13 @@ def main():
     itl_contents += ')\n'
 
     # ITL Imports
-    def it_to_wasm_func(func):
-        args = [ty.to_wasm() for ty in func.args]
-        ret = func.ret.to_wasm()
-        return '(func {} "{}" (param {}) (result {}))'.format(
-            func.name, func.name, ' '.join(args), ret)
     for imp, funcs in ast.imports.items():
         itl_contents += '(import "{}"\n'.format(imp)
         for func in funcs:
-            args = [ty.to_it() for ty in func.args]
-            ret = func.ret.to_it()
-            itl_contents += tab + '(func {} "{}" (param {}) (result {}))\n'.format(
-                func.name, func.name, ' '.join(args), ret)
+            itl_contents += tab + func.to_it_decl() + '\n'
         itl_contents += ')\n'
 
     # Wasm module
-    integer_types = ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']
-    float_types = ['f32', 'f64']
-    numeric_types = integer_types + float_types
-    def lift(ty, expr):
-        # C++ -> IT
-        if ty.ty in numeric_types:
-            return '(as {} {})'.format(ty.ty, expr)
-        elif ty.ty == 'string':
-            return '(call _it_cppToString {})'.format(expr)
-        elif ty.ty == 'buffer':
-            return '(call _it_cppToBuffer  {})'.format(expr)
-        elif ty.ty == 'void':
-            return expr
-        struct = ast.types.get(ty.ty)
-        assert struct, 'unknown lifting type: ' + ty.ty
-        return '(make-record {})'.format(ty.ty)
-    def lower(ty, expr):
-        if ty.ty in integer_types:
-            # TODO: handle 64bit ints
-            return '(as i32 {})'.format(expr)
-        elif ty.ty in float_types:
-            # currently all float types happen to match core wasm
-            return '(as {} {})'.format(ty.ty, expr)
-        elif ty.ty == 'string':
-            return '(call _it_stringToCpp {})'.format(expr)
-        elif ty.ty == 'buffer':
-            return '(call _it_bufferToCpp {})'.format(expr)
-        elif ty.ty == 'void':
-            return expr
-        assert False, 'unknown lowering type: ' + ty.ty
     # declare imports on the core module
     itl_contents += '\n(module wasm "{}"\n'.format(wasm_out)
     # builtin exports to polyfill for WASI imports added by Emscripten
@@ -162,44 +120,24 @@ def main():
     for imp, funcs in ast.imports.items():
         itl_contents += tab + '(import "{}"\n'.format(imp)
         for func in funcs:
-            args = ' '.join(arg.to_wasm() for arg in func.args)
-            ret = func.ret.to_wasm() if func.ret != 'void' else ''
-            itl_contents += tab * 2 + '(func _it_{} "{}" (param {}) (result {})\n'.format(
-                func.name, func.name, args, ret)
-            args = ''
-            for i, arg in enumerate(func.args):
-                local = '(local {})'.format(i)
-                args += '\n' + tab * 4 + lift(arg, local)
-            call = '(call {}{})'.format(func.name, args)
-            body = lower(func.ret, call)
-            itl_contents += tab * 3 + body + ')\n'
+            itl_contents += func.to_itl_import()
         itl_contents += tab + ')\n'
     # C++ runtime builtin declarations
     def builtin(name, args, ret):
-        return Func(name, [Type(arg) for arg in args], Type(ret))
+        return Func(name, FuncType([SimpleType(arg) for arg in args], SimpleType(ret)))
     builtins = [
         builtin('_it_malloc', ['string'], 's32'),
         builtin('_it_strlen', ['string'], 's32'),
         builtin('_it_writeStringTerm', ['string', 's32'], 'void'),
     ]
     for func in ast.exports + builtins:
-        itl_contents += tab + it_to_wasm_func(func) + '\n'
+        itl_contents += tab + func.to_it_decl() + '\n'
     itl_contents += ')\n\n'
 
     # ITL exports
     itl_contents += '(export\n'
     for func in ast.exports:
-        ret = func.ret if func.ret != 'void' else ''
-        itl_contents += tab + '(func _it_{} "{}" (param {}) (result {})\n'.format(
-            func.name, func.name, ' '.join([ty.to_it() for ty in func.args]), ret)
-        args = ''
-        for i, arg in enumerate(func.args):
-            local = '(local {})'.format(i)
-            args += '\n' + tab * 3 + lower(arg, local)
-        call = '(call {}{})'.format(func.name, args)
-        body = lift(func.ret, call)
-        itl_contents += tab * 2 + body + '\n'
-        itl_contents += tab + ')\n'
+        itl_contents += func.to_itl_export()
     itl_contents += ')\n\n'
 
     # builtin helpers
@@ -258,21 +196,104 @@ def main():
 
     write_file(itl_out, itl_contents)
 
+integer_types = ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']
+float_types = ['f32', 'f64']
+numeric_types = integer_types + float_types
+def lift(ty, expr):
+    # C++ -> IT
+    if isinstance(ty, FuncType):
+        # TODO
+        return '(lift {})'.format(ty.to_it())
+    if ty.ty in numeric_types:
+        return '(as {} {})'.format(ty.ty, expr)
+    elif ty.ty == 'string':
+        return '(call _it_cppToString {})'.format(expr)
+    elif ty.ty == 'buffer':
+        return '(call _it_cppToBuffer  {})'.format(expr)
+    elif ty.ty == 'void':
+        return expr
+    struct = ast.types.get(ty.ty)
+    assert struct, 'unknown lifting type: ' + ty.ty
+    return '(make-record {})'.format(ty.ty)
+def lower(ty, expr):
+    if isinstance(ty, FuncType):
+        # TODO
+        return '(lower {})'.format(ty.to_it())
+    if ty.ty in integer_types:
+        # TODO: handle 64bit ints
+        return '(as i32 {})'.format(expr)
+    elif ty.ty in float_types:
+        # currently all float types happen to match core wasm
+        return '(as {} {})'.format(ty.ty, expr)
+    elif ty.ty == 'string':
+        return '(call _it_stringToCpp {})'.format(expr)
+    elif ty.ty == 'buffer':
+        return '(call _it_bufferToCpp {})'.format(expr)
+    elif ty.ty == 'void':
+        return expr
+    assert False, 'unknown lowering type: ' + ty.ty
+
 class AST(object):
     def __init__(self, imports, exports, types):
         self.imports = imports
         self.exports = exports
         self.types = types
+
 class Func(object):
-    def __init__(self, name, args, ret):
+    def __init__(self, name, ty):
+        assert(isinstance(ty, FuncType))
         self.name = name
-        self.args = args
-        self.ret = ret
+        self.ty = ty
+
+    def to_cpp(self):
+        return self.ty.to_cpp(name=self.name)
+    def to_wasm(self):
+        args = [ty.to_wasm() for ty in self.ty.args]
+        ret = self.ty.ret.to_wasm()
+        return '(func {} "{}" (param {}) (result {}))'.format(
+            self.name, self.name, ' '.join(args), ret)
+    def to_it_decl(self):
+        args = [ty.to_it() for ty in self.ty.args]
+        ret = self.ty.ret.to_it()
+        return '(func {} "{}" (param {}) (result {}))'.format(
+            self.name, self.name, ' '.join(args), ret)
+    def to_itl_import(self):
+        args = ' '.join(arg.to_wasm() for arg in self.ty.args)
+        ret = self.ty.ret.to_wasm()
+        contents = tab * 2 + '(func _it_{} "{}" (param {}) (result {})\n'.format(
+            self.name, self.name, args, ret)
+        args = ''
+        for i, arg in enumerate(self.ty.args):
+            local = '(local {})'.format(i)
+            args += '\n' + tab * 4 + lift(arg, local)
+        call = '(call {}{})'.format(self.name, args)
+        body = lower(self.ty.ret, call)
+        contents += tab * 3 + body + ')\n'
+        return contents
+    def to_itl_export(self):
+        ret = self.ty.ret.to_it()
+        contents = tab + '(func _it_{} "{}" (param {}) (result {})\n'.format(
+            self.name, self.name, ' '.join([ty.to_it() for ty in self.ty.args]), ret)
+        args = ''
+        for i, arg in enumerate(self.ty.args):
+            local = '(local {})'.format(i)
+            args += '\n' + tab * 3 + lower(arg, local)
+        call = '(call {}{})'.format(self.name, args)
+        body = lift(self.ty.ret, call)
+        contents += tab * 2 + body + '\n'
+        contents += tab + ')\n'
+        return contents
+
 class Struct(object):
     def __init__(self, name, fields):
         self.name = name
         self.fields = fields
+
 class Type(object):
+    # base class for type system
+    pass
+
+class SimpleType(Type):
     def __init__(self, ty):
         self.ty = ty
 
@@ -299,6 +320,26 @@ class Type(object):
     def to_wasm(self):
         if self.ty == 'void':
             return ''
+        return 'i32'
+
+class FuncType(Type):
+    def __init__(self, args, ret):
+        for ty in args:
+            assert(isinstance(ty, Type))
+        assert(isinstance(ret, Type))
+        self.args = args
+        self.ret = ret
+
+    def to_it(self):
+        args = [arg.to_it() for arg in self.args]
+        ret = self.ret.to_it()
+        return '<<functype : {} -> {}>>'.format(args, ret)
+    def to_cpp(self, name=''):
+        ret_ty = self.ret.to_cpp()
+        arg_tys = [arg.to_cpp() for arg in self.args]
+        arg_str = ', '.join(arg_tys)
+        return '{} {}({});\n'.format(ret_ty, name, arg_str)
+    def to_wasm(self):
         return 'i32'
 
 def parse_it(contents):
@@ -388,24 +429,36 @@ class Parser(object):
     def parse_func(self):
         self.expect('func')
         name = self.pop()
-        self.expect('(')
 
+        ty = self.parse_func_type()
+        self.expect(';')
+        return Func(name, ty)
+
+    def parse_type(self):
+        kind = self.pop()
+        if kind == 'func':
+            return self.parse_func_type()
+        else:
+            return SimpleType(kind)
+
+    def parse_func_type(self):
+        # assumption: we have already popped `func` or `func [name]`
+
+        # parse args in ()s
         args = []
+        self.expect('(')
         while self.peek() != ')':
             args.append(self.parse_type())
             if self.peek() != ')':
                 self.expect(',')
         self.expect(')')
 
+        # return type, or void
         if self.check('->'):
             ret = self.parse_type()
         else:
-            ret = Type('void')
-        self.expect(';')
-        return Func(name, args, ret)
-
-    def parse_type(self):
-        return Type(self.pop())
+            ret = SimpleType('void')
+        return FuncType(args, ret)
 
     def parse_type_decl(self):
         self.expect('type')
