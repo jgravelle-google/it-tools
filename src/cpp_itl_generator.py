@@ -62,12 +62,12 @@ def main():
     for imp, funcs in ast.imports.items():
         for func in funcs:
             attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.name)
-            import_decls += attr + ' ' + func.to_cpp()
+            import_decls += attr + ' ' + func.to_cpp() + ';\n'
     h_contents = h_contents.replace('/**IMPORT_DECLS**/', import_decls)
     export_decls = ''
     for func in ast.exports:
         attr = '__attribute__((export_name("{}")))'.format(func.name)
-        export_decls += attr + ' ' + func.to_cpp()
+        export_decls += attr + ' ' + func.to_cpp() + ';\n'
     for ty, funcs in ast.types.items():
         print('TYPES', ty)
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
@@ -203,7 +203,7 @@ def lift(ty, expr):
     # C++ -> IT
     if isinstance(ty, FuncType):
         # TODO
-        return '(lift {})'.format(ty.to_it())
+        return '(table-read wasm "__indirect_function_table" {})'.format(expr)
     if ty.ty in numeric_types:
         return '(as {} {})'.format(ty.ty, expr)
     elif ty.ty == 'string':
@@ -253,10 +253,7 @@ class Func(object):
         return '(func {} "{}" (param {}) (result {}))'.format(
             self.name, self.name, ' '.join(args), ret)
     def to_it_decl(self):
-        args = [ty.to_it() for ty in self.ty.args]
-        ret = self.ty.ret.to_it()
-        return '(func {} "{}" (param {}) (result {}))'.format(
-            self.name, self.name, ' '.join(args), ret)
+        return self.ty.to_it(name='{0} "{0}"'.format(self.name))
     def to_itl_import(self):
         args = ' '.join(arg.to_wasm() for arg in self.ty.args)
         ret = self.ty.ret.to_wasm()
@@ -330,15 +327,16 @@ class FuncType(Type):
         self.args = args
         self.ret = ret
 
-    def to_it(self):
+    def to_it(self, name=''):
         args = [arg.to_it() for arg in self.args]
         ret = self.ret.to_it()
-        return '<<functype : {} -> {}>>'.format(args, ret)
-    def to_cpp(self, name=''):
+        return '(func {} (param {}) (result {}))'.format(
+            name, ' '.join(args), ret)
+    def to_cpp(self, name='(*)'):
         ret_ty = self.ret.to_cpp()
         arg_tys = [arg.to_cpp() for arg in self.args]
         arg_str = ', '.join(arg_tys)
-        return '{} {}({});\n'.format(ret_ty, name, arg_str)
+        return '{} {}({})'.format(ret_ty, name, arg_str)
     def to_wasm(self):
         return 'i32'
 

@@ -318,6 +318,18 @@ class IntExpr(BaseExpr):
     def as_wat(self):
         return '(i32.const {})'.format(self.val)
 
+class TableReadExpr(BaseExpr):
+    def __init__(self, mod, table, idx):
+        self.mod = mod
+        self.table = table
+        self.idx = idx
+
+    def children(self):
+        return [self.idx]
+
+    def as_js(self):
+        return '{}["{}"].get({})'.format(self.mod, self.table, self.idx.as_js())
+
 class UnreachableExpr(BaseExpr):
     def as_js(self):
         return '(function() { throw "UNREACHABLE"; })()'

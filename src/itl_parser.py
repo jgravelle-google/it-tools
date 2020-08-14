@@ -135,7 +135,14 @@ def parse(body):
             lhs = parse_expr(sexpr[1])
             rhs = parse_expr(sexpr[2])
             return AddExpr(lhs, rhs)
+        elif head == 'table-read':
+            assert(len(sexpr) == 4)
+            mod = sexpr[1]
+            table = unquote(sexpr[2])
+            idx = parse_expr(sexpr[3])
+            return TableReadExpr(mod, table, idx)
         elif head == 'make-record':
+            # TODO: implement
             return UnreachableExpr()
         elif head == 'unreachable':
             assert(len(sexpr) == 1)
