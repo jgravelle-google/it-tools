@@ -32,6 +32,11 @@ class Component(object):
         self.string_table[val] = ret
         return ret
 
+class FuncType(object):
+    # TODO: integrate with Func?
+    def __init__(self, params, results):
+        self.params = params
+        self.results = results
 class Func(object):
     def __init__(self, name, exname, params, results, body, location):
         self.name = name
@@ -330,8 +335,55 @@ class TableReadExpr(BaseExpr):
     def as_js(self):
         return '{}["{}"].get({})'.format(self.mod, self.table, self.idx.as_js())
 
+class LiftRefExpr(BaseExpr):
+    def __init__(self, expr):
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+
+    def as_js(self):
+        return 'liftRef({})'.format(self.expr.as_js())
+
+class LowerRefExpr(BaseExpr):
+    def __init__(self, expr):
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+
+    def as_js(self):
+        return 'lowerRef({})'.format(self.expr.as_js())
+
 class UnreachableExpr(BaseExpr):
     def as_js(self):
         return '(function() { throw "UNREACHABLE"; })()'
     def as_wat(self):
         return '(unreachable)'
+
+class LambdaExpr(BaseExpr):
+    def __init__(self, ty, body, num_locals):
+        self.fn_ty = ty
+        self.body = body
+        # num_locals here is the number of locals present when the lambda is
+        # declared, in order to assign lambda local values
+        self.num_locals = num_locals
+
+    def children(self):
+        return [self.body]
+
+    def as_js(self):
+        args = ', '.join('x' + str(i + self.num_locals) for i in range(len(self.fn_ty.params)))
+        return '(({}) => {})'.format(args, self.body.as_js())
+
+# naming; ugh
+class CallExprExpr(BaseExpr):
+    def __init__(self, fn, args):
+        self.fn = fn
+        self.args = args
+
+    def children(self):
+        return [self.fn] + self.args
+
+    def as_js(self):
+        return '{}({})'.format(self.fn.as_js(), ', '.join(arg.as_js() for arg in self.args))

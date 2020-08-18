@@ -36,6 +36,22 @@ const /**COMPONENT_NAME**/ = {
             u8.set(b8, ptr);
         }
 
+        // References
+        // first elem is null so we avoid assigning 0 as a valid index
+        let refArray = [null];
+        let refToIdx = new WeakMap();
+        function liftRef(idx) {
+            // TODO: create new ref entries for native wasm refs
+            return refArray[idx];
+        }
+        function lowerRef(ref) {
+            if (!refToIdx.has(ref)) {
+                refToIdx.set(ref, refArray.length);
+                refArray.push(ref);
+            }
+            return refToIdx.get(ref);
+        }
+
 /**COMPONENT_FUNCTIONS**/
 
 /**LOAD_MODULES**/

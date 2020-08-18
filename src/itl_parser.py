@@ -147,6 +147,24 @@ def parse(body):
         elif head == 'unreachable':
             assert(len(sexpr) == 1)
             return UnreachableExpr()
+        elif head == 'lambda':
+            assert(len(sexpr) == 3)
+            assert(sexpr[1][0] == 'func')
+            ty = parse_func_type(sexpr[1][1:2+1])
+            body = parse_expr(sexpr[2])
+            return LambdaExpr(ty, body, num_locals)
+        elif head == 'call-expr':
+            fn = parse_expr(sexpr[1])
+            args = [parse_expr(s) for s in sexpr[2:]]
+            return CallExprExpr(fn, args)
+        elif head == 'lift-ref':
+            assert(len(sexpr) == 2)
+            expr = parse_expr(sexpr[1])
+            return LiftRefExpr(expr)
+        elif head == 'lower-ref':
+            assert(len(sexpr) == 2)
+            expr = parse_expr(sexpr[1])
+            return LowerRefExpr(expr)
         else:
             try:
                 n = int(sexpr)
@@ -154,18 +172,21 @@ def parse(body):
             except:
                 pass
         assert False, 'Unknown expr: {}'.format(sexpr)
+    def parse_func_type(sexpr):
+        assert(sexpr[0][0] == 'param')
+        params = sexpr[0][1:]
+        assert(sexpr[1][0] == 'result')
+        results = sexpr[1][1:]
+        return FuncType(params, results)
     def parse_func(sexpr, location):
         global num_locals, extra_locals
         assert(sexpr[0] == 'func')
         name = sexpr[1]
         external_name = unquote(sexpr[2])
-        assert(sexpr[3][0] == 'param')
-        params = sexpr[3][1:]
-        assert(sexpr[4][0] == 'result')
-        results = sexpr[4][1:]
-        num_locals = len(params)
+        ty = parse_func_type(sexpr[3:4+1])
+        num_locals = len(ty.params)
         body = [parse_expr(expr) for expr in sexpr[5:]]
-        func = Func(name, external_name, params, results, body, location)
+        func = Func(name, external_name, ty.params, ty.results, body, location)
         for expr in body:
             expr.initialize(func=func)
         return func

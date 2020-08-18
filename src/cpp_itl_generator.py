@@ -199,26 +199,33 @@ def main():
 integer_types = ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']
 float_types = ['f32', 'f64']
 numeric_types = integer_types + float_types
-def lift(ty, expr):
+def lift(ty, expr, n_locals):
     # C++ -> IT
     if isinstance(ty, FuncType):
-        # TODO
-        return '(table-read wasm "__indirect_function_table" {})'.format(expr)
+        fn = '(table-read wasm "__indirect_function_table" {})'.format(expr)
+        args = ''
+        for i, arg in enumerate(ty.args):
+            args += lower(arg, '(local {})'.format(n_locals + i), n_locals + len(ty.args))
+        return '(lambda {} (call-expr {} {}))'.format(
+            ty.to_it(), fn, args)
     if ty.ty in numeric_types:
         return '(as {} {})'.format(ty.ty, expr)
     elif ty.ty == 'string':
         return '(call _it_cppToString {})'.format(expr)
     elif ty.ty == 'buffer':
         return '(call _it_cppToBuffer  {})'.format(expr)
+    elif ty.ty == 'ref':
+        return '(lift-ref {})'.format(expr)
     elif ty.ty == 'void':
         return expr
     struct = ast.types.get(ty.ty)
     assert struct, 'unknown lifting type: ' + ty.ty
     return '(make-record {})'.format(ty.ty)
-def lower(ty, expr):
+def lower(ty, expr, n_locals):
     if isinstance(ty, FuncType):
         # TODO
-        return '(lower {})'.format(ty.to_it())
+        assert False
+        # return '(lower {})'.format(ty.to_it())
     if ty.ty in integer_types:
         # TODO: handle 64bit ints
         return '(as i32 {})'.format(expr)
@@ -229,6 +236,8 @@ def lower(ty, expr):
         return '(call _it_stringToCpp {})'.format(expr)
     elif ty.ty == 'buffer':
         return '(call _it_bufferToCpp {})'.format(expr)
+    elif ty.ty == 'ref':
+        return '(lower-ref {})'.format(expr)
     elif ty.ty == 'void':
         return expr
     assert False, 'unknown lowering type: ' + ty.ty
@@ -262,9 +271,9 @@ class Func(object):
         args = ''
         for i, arg in enumerate(self.ty.args):
             local = '(local {})'.format(i)
-            args += '\n' + tab * 4 + lift(arg, local)
+            args += '\n' + tab * 4 + lift(arg, local, n_locals=len(self.ty.args))
         call = '(call {}{})'.format(self.name, args)
-        body = lower(self.ty.ret, call)
+        body = lower(self.ty.ret, call, n_locals=len(self.ty.args))
         contents += tab * 3 + body + ')\n'
         return contents
     def to_itl_export(self):
@@ -274,9 +283,9 @@ class Func(object):
         args = ''
         for i, arg in enumerate(self.ty.args):
             local = '(local {})'.format(i)
-            args += '\n' + tab * 3 + lower(arg, local)
+            args += '\n' + tab * 3 + lower(arg, local, n_locals=len(self.ty.args))
         call = '(call {}{})'.format(self.name, args)
-        body = lift(self.ty.ret, call)
+        body = lift(self.ty.ret, call, n_locals=len(self.ty.args))
         contents += tab * 2 + body + '\n'
         contents += tab + ')\n'
         return contents
@@ -310,6 +319,7 @@ class SimpleType(Type):
             'f32': 'float',
             'f64': 'double',
             'string': 'const char*',
+            'ref': 'void*',
             'void': 'void',
             'buffer': 'ITBuffer*',
         }
