@@ -94,7 +94,7 @@ def main():
     itl_contents += '(types\n'
     for struct in ast.types.values():
         itl_contents += tab + '(record {}\n'.format(struct.name)
-        for name, ty in struct.fields:
+        for name, ty in struct.fields.items():
             itl_contents += tab * 2 + '({} {})\n'.format(name, ty)
         itl_contents += tab + ')\n'
     itl_contents += ')\n'
@@ -199,48 +199,6 @@ def main():
 integer_types = ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']
 float_types = ['f32', 'f64']
 numeric_types = integer_types + float_types
-def lift(ty, expr, n_locals):
-    # C++ -> IT
-    if isinstance(ty, FuncType):
-        fn = '(table-read wasm "__indirect_function_table" {})'.format(expr)
-        args = ''
-        for i, arg in enumerate(ty.args):
-            args += lower(arg, '(local {})'.format(n_locals + i), n_locals + len(ty.args))
-        return '(lambda {} (call-expr {} {}))'.format(
-            ty.to_it(), fn, args)
-    if ty.ty in numeric_types:
-        return '(as {} {})'.format(ty.ty, expr)
-    elif ty.ty == 'string':
-        return '(call _it_cppToString {})'.format(expr)
-    elif ty.ty == 'buffer':
-        return '(call _it_cppToBuffer  {})'.format(expr)
-    elif ty.ty == 'ref':
-        return '(lift-ref {})'.format(expr)
-    elif ty.ty == 'void':
-        return expr
-    struct = ast.types.get(ty.ty)
-    assert struct, 'unknown lifting type: ' + ty.ty
-    return '(make-record {})'.format(ty.ty)
-def lower(ty, expr, n_locals):
-    if isinstance(ty, FuncType):
-        # TODO
-        assert False
-        # return '(lower {})'.format(ty.to_it())
-    if ty.ty in integer_types:
-        # TODO: handle 64bit ints
-        return '(as i32 {})'.format(expr)
-    elif ty.ty in float_types:
-        # currently all float types happen to match core wasm
-        return '(as {} {})'.format(ty.ty, expr)
-    elif ty.ty == 'string':
-        return '(call _it_stringToCpp {})'.format(expr)
-    elif ty.ty == 'buffer':
-        return '(call _it_bufferToCpp {})'.format(expr)
-    elif ty.ty == 'ref':
-        return '(lower-ref {})'.format(expr)
-    elif ty.ty == 'void':
-        return expr
-    assert False, 'unknown lowering type: ' + ty.ty
 
 class AST(object):
     def __init__(self, imports, exports, types):
@@ -271,9 +229,9 @@ class Func(object):
         args = ''
         for i, arg in enumerate(self.ty.args):
             local = '(local {})'.format(i)
-            args += '\n' + tab * 4 + lift(arg, local, n_locals=len(self.ty.args))
+            args += '\n' + tab * 4 + arg.lift(local, n_locals=len(self.ty.args))
         call = '(call {}{})'.format(self.name, args)
-        body = lower(self.ty.ret, call, n_locals=len(self.ty.args))
+        body = self.ty.ret.lower(call, n_locals=len(self.ty.args))
         contents += tab * 3 + body + ')\n'
         return contents
     def to_itl_export(self):
@@ -283,23 +241,34 @@ class Func(object):
         args = ''
         for i, arg in enumerate(self.ty.args):
             local = '(local {})'.format(i)
-            args += '\n' + tab * 3 + lower(arg, local, n_locals=len(self.ty.args))
+            args += '\n' + tab * 3 + arg.lower(local, n_locals=len(self.ty.args))
         call = '(call {}{})'.format(self.name, args)
-        body = lift(self.ty.ret, call, n_locals=len(self.ty.args))
+        body = self.ty.ret.lift(call, n_locals=len(self.ty.args))
         contents += tab * 2 + body + '\n'
         contents += tab + ')\n'
         return contents
-
-class Struct(object):
-    def __init__(self, name, fields):
-        self.name = name
-        self.fields = fields
 
 class Type(object):
     # base class for type system
     pass
 
 class SimpleType(Type):
+    mapping = {
+        'u1': 'bool',
+        's8': 'char',
+        'u8': 'unsigned char',
+        's16': 'short',
+        'u16': 'unsigned short',
+        's32': 'int',
+        'u32': 'unsigned int',
+        'f32': 'float',
+        'f64': 'double',
+        'string': 'const char*',
+        'ref': 'void*',
+        'void': 'void',
+        'buffer': 'ITBuffer*',
+    }
+
     def __init__(self, ty):
         self.ty = ty
 
@@ -308,26 +277,54 @@ class SimpleType(Type):
             return ''
         return self.ty
     def to_cpp(self):
-        mapping = {
-            'u1': 'bool',
-            's8': 'char',
-            'u8': 'unsigned char',
-            's16': 'short',
-            'u16': 'unsigned short',
-            's32': 'int',
-            'u32': 'unsigned int',
-            'f32': 'float',
-            'f64': 'double',
-            'string': 'const char*',
-            'ref': 'void*',
-            'void': 'void',
-            'buffer': 'ITBuffer*',
-        }
-        return mapping[self.ty]
+        return SimpleType.mapping[self.ty]
     def to_wasm(self):
         if self.ty == 'void':
             return ''
         return 'i32'
+
+    def lift(self, expr, n_locals):
+        if self.ty in numeric_types:
+            return '(as {} {})'.format(self.ty, expr)
+        elif self.ty == 'string':
+            return '(call _it_cppToString {})'.format(expr)
+        elif self.ty == 'buffer':
+            return '(call _it_cppToBuffer  {})'.format(expr)
+        elif self.ty == 'ref':
+            return '(lift-ref {})'.format(expr)
+        elif self.ty == 'void':
+            return expr
+        assert False
+
+    def lower(self, expr, n_locals):
+        if self.ty in integer_types:
+            # TODO: handle 64bit ints
+            return '(as i32 {})'.format(expr)
+        elif self.ty in float_types:
+            # currently all float types happen to match core wasm
+            return '(as {} {})'.format(self.ty, expr)
+        elif self.ty == 'string':
+            return '(call _it_stringToCpp {})'.format(expr)
+        elif self.ty == 'buffer':
+            return '(call _it_bufferToCpp {})'.format(expr)
+        elif self.ty == 'ref':
+            return '(lower-ref {})'.format(expr)
+        elif self.ty == 'void':
+            return expr
+        assert False
+
+class StructType(Type):
+    def __init__(self, name, fields):
+        self.name = name
+        self.fields = fields
+
+    def to_it(self):
+        return self.name
+    def to_cpp(self):
+        return self.name
+
+    def lower(self, expr, n_locals):
+        return '(lowering struct {} {})'.format(self.name, expr)
 
 class FuncType(Type):
     def __init__(self, args, ret):
@@ -349,6 +346,14 @@ class FuncType(Type):
         return '{} {}({})'.format(ret_ty, name, arg_str)
     def to_wasm(self):
         return 'i32'
+
+    def lift(self, expr, n_locals):
+        fn = '(table-read wasm "__indirect_function_table" {})'.format(expr)
+        args = ''
+        for i, arg in enumerate(self.args):
+            args += arg.lower('(local {})'.format(n_locals + i), n_locals + len(self.args))
+        return '(lambda {} (call-expr {} {}))'.format(
+            self.to_it(), fn, args)
 
 def parse_it(contents):
     tokens = Lexer(contents).lex()
@@ -385,7 +390,7 @@ class Lexer(object):
                     self.pop()
             elif c in ' \n\r\t':
                 self.term()
-            elif c in '(){},;':
+            elif c in '(){},;:':
                 self.term()
                 self.tokens.append(c)
             else:
@@ -397,11 +402,12 @@ class Parser(object):
     def __init__(self, tokens):
         self.i = 0
         self.tokens = tokens
+        self.types = {}
 
     def parse(self):
         imports = {}
         exports = []
-        types = {}
+        self.types = {}
         while self.i < len(self.tokens):
             head = self.pop()
             if head == 'export':
@@ -409,18 +415,19 @@ class Parser(object):
                 while True:
                     if self.peek() == 'func':
                         exports.append(self.parse_func())
-                    elif self.peek() == 'type':
-                        ty = self.parse_type_decl()
-                        types[ty.name] = ty
                     else:
                         self.expect('}')
                         break
             elif head == 'import':
                 name, funcs = self.parse_import()
                 imports[name] = funcs
+            elif head == 'type':
+                name = self.pop()
+                self.expect('=')
+                self.types[name] = self.parse_type()
             else:
                 assert False, 'unknown top-level stmt'
-        return AST(imports, exports, types)
+        return AST(imports, exports, self.types)
 
     def parse_import(self):
         name = unquote(self.pop())
@@ -446,6 +453,10 @@ class Parser(object):
         kind = self.pop()
         if kind == 'func':
             return self.parse_func_type()
+        elif kind == 'struct':
+            return self.parse_struct()
+        elif kind in self.types:
+            return self.types[kind]
         else:
             return SimpleType(kind)
 
@@ -468,24 +479,18 @@ class Parser(object):
             ret = SimpleType('void')
         return FuncType(args, ret)
 
-    def parse_type_decl(self):
-        self.expect('type')
-        name = self.pop()
-        self.expect('=')
-        kind = self.pop()
-        if kind == 'struct':
-            self.expect('{')
-            body = self.until('}')
-            i = 0
-            fields = []
-            while i < len(body):
-                ty = body[i]
-                field_name = body[i+1]
-                assert body[i+2] == ';'
-                i += 3
-                fields.append((ty, field_name))
-            return Struct(name, fields)
-        assert False, 'unknown type: ' + kind
+    def parse_struct(self):
+        # assume we've popped `struct`, as the identifier
+        self.expect('{')
+        fields = {}
+        while self.peek() != '}':
+            name = self.pop()
+            self.expect(':')
+            ty = self.parse_type()
+            self.expect(';')
+            fields[name] = ty
+        self.expect('}')
+        return StructType(name, fields)
 
     # Helper funcs
     def peek(self):
