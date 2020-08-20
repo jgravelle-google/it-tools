@@ -47,6 +47,9 @@ public:
     FixedBuffer() : Buffer<T>(N) {}
 };
 
+// Types
+/**TYPE_DECLS**/
+
 // Imports
 /**IMPORT_DECLS**/
 

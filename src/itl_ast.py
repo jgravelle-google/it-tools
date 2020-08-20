@@ -387,3 +387,15 @@ class CallExprExpr(BaseExpr):
 
     def as_js(self):
         return '{}({})'.format(self.fn.as_js(), ', '.join(arg.as_js() for arg in self.args))
+
+class ReadFieldExpr(BaseExpr):
+    def __init__(self, record, field, expr):
+        self.record = record
+        self.field = field
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+
+    def as_js(self):
+        return '{}["{}"]'.format(self.expr.as_js(), self.field)

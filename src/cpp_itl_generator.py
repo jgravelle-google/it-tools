@@ -8,6 +8,7 @@ import sys
 import traceback
 
 tab = '    '
+srcpath = os.path.dirname(__file__)
 
 def main():
     arg_parser = argparse.ArgumentParser()
@@ -24,8 +25,6 @@ def main():
              ' overridden to match the core wasm module to be loaded')
     args = arg_parser.parse_args(sys.argv[1:])
 
-    srcpath = os.path.dirname(__file__)
-
     # Paths
     cpp_in = args.cpp_in
     basename, _ = os.path.splitext(cpp_in)
@@ -41,10 +40,10 @@ def main():
         # / instead of os.path.join because ITL expects / for paths
         wasm_out = outpath + '/' + basename + '.wasm'
 
-    def write_file(filename, contents):
-        ensure_path_for(filename)
-        open(filename, 'w').write(contents)
+    ast = write_cpp(cpp_in, cpp_out)
+    write_itl(ast, wasm_out, itl_out)
 
+def write_cpp(cpp_in, cpp_out):
     # read + parse
     contents = open(cpp_in).read()
     start_str, end_str = '/**IT_START**/', '/**IT_END**/'
@@ -52,8 +51,6 @@ def main():
     end = contents.find(end_str)
     it_contents = contents[start:end]
     ast = parse_it(it_contents)
-
-    #############################################
 
     # Write compute import+export declarations
     template_path = os.path.join(srcpath, 'c_header_template.h')
@@ -68,11 +65,16 @@ def main():
     for func in ast.exports:
         attr = '__attribute__((export_name("{}")))'.format(func.name)
         export_decls += attr + ' ' + func.to_cpp() + ';\n'
-    for ty, funcs in ast.types.items():
-        print('TYPES', ty)
     h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
-
-    #############################################
+    type_decls = ''
+    for struct in ast.types.values():
+        if not isinstance(struct, StructType):
+            continue
+        type_decls += 'struct ' + struct.name + ' {\n'
+        for name, ty in struct.fields.items():
+            type_decls += tab + '{} {};\n'.format(ty.to_cpp(), name)
+        type_decls += '};\n'
+    h_contents = h_contents.replace('/**TYPE_DECLS**/', type_decls)
 
     # Write output .cpp file
     cpp_contents = (
@@ -84,10 +86,10 @@ def main():
     )
     write_file(cpp_out, cpp_contents)
 
-    #############################################
+    return ast
 
-    # Write .itl file
-    # TODO: extract this AST -> ITL logic to an ItlWriter class
+def write_itl(ast, wasm_out, itl_out):
+    # TODO: extract this AST -> ITL logic to a shared ItlWriter class (?)
     itl_contents = ''
 
     # ITL Types
@@ -95,7 +97,7 @@ def main():
     for struct in ast.types.values():
         itl_contents += tab + '(record {}\n'.format(struct.name)
         for name, ty in struct.fields.items():
-            itl_contents += tab * 2 + '({} {})\n'.format(name, ty)
+            itl_contents += tab * 2 + '({} {})\n'.format(name, ty.to_it())
         itl_contents += tab + ')\n'
     itl_contents += ')\n'
 
@@ -194,6 +196,25 @@ def main():
 
 '''
 
+    # adapters for structs
+    for struct in ast.types.values():
+        if not isinstance(struct, StructType):
+            continue
+        # TODO
+        itl_contents += '(func _it_lift_{} "" (param i32) (result any)\n'.format(struct.name)
+        itl_contents += ')\n'
+
+        itl_contents += '(func _it_lower_{} "" (param any) (result i32)\n'.format(struct.name)
+        itl_contents += tab + '(let (call _it_malloc {}))\n'.format(struct.sizeof())
+        offset = 0
+        for name, ty in struct.fields.items():
+            read = '(read-field {} {} (local 0))'.format(struct.name, name)
+            itl_contents += tab + '(store u32 wasm "memory" (+ {} (local 1)) {})\n'.format(
+                offset, ty.lower(read, n_locals=2))
+            offset += ty.sizeof()
+        itl_contents += tab + '(local 1)\n'
+        itl_contents += ')\n'
+
     write_file(itl_out, itl_contents)
 
 integer_types = ['u1', 's8', 'u8', 's16', 'u16', 's32', 'u32']
@@ -264,7 +285,7 @@ class SimpleType(Type):
         'f32': 'float',
         'f64': 'double',
         'string': 'const char*',
-        'ref': 'void*',
+        'any': 'void*',
         'void': 'void',
         'buffer': 'ITBuffer*',
     }
@@ -290,7 +311,7 @@ class SimpleType(Type):
             return '(call _it_cppToString {})'.format(expr)
         elif self.ty == 'buffer':
             return '(call _it_cppToBuffer  {})'.format(expr)
-        elif self.ty == 'ref':
+        elif self.ty == 'any':
             return '(lift-ref {})'.format(expr)
         elif self.ty == 'void':
             return expr
@@ -307,24 +328,40 @@ class SimpleType(Type):
             return '(call _it_stringToCpp {})'.format(expr)
         elif self.ty == 'buffer':
             return '(call _it_bufferToCpp {})'.format(expr)
-        elif self.ty == 'ref':
+        elif self.ty == 'any':
             return '(lower-ref {})'.format(expr)
         elif self.ty == 'void':
             return expr
         assert False
 
+    def sizeof(self):
+        # TODO
+        return 4
+
 class StructType(Type):
-    def __init__(self, name, fields):
-        self.name = name
+    def __init__(self, fields):
         self.fields = fields
+        # this is silly; structs need to be named, but leaving space for
+        # `type foo = struct {...}` syntax makes parsing awkward
+        # so set a name here to backfill later
+        self.name = None
 
     def to_it(self):
+        assert(self.name is not None)
         return self.name
     def to_cpp(self):
-        return self.name
+        assert(self.name is not None)
+        return self.name + '*'
 
     def lower(self, expr, n_locals):
-        return '(lowering struct {} {})'.format(self.name, expr)
+        assert(self.name is not None)
+        return '(call _it_lower_{} {})'.format(self.name, expr)
+
+    def sizeof(self):
+        size = 0
+        for ty in self.fields.values():
+            size += ty.sizeof()
+        return size
 
 class FuncType(Type):
     def __init__(self, args, ret):
@@ -427,6 +464,9 @@ class Parser(object):
                 self.types[name] = self.parse_type()
             else:
                 assert False, 'unknown top-level stmt'
+        for name, ty in self.types.items():
+            if isinstance(ty, StructType):
+                ty.name = name
         return AST(imports, exports, self.types)
 
     def parse_import(self):
@@ -484,13 +524,13 @@ class Parser(object):
         self.expect('{')
         fields = {}
         while self.peek() != '}':
-            name = self.pop()
+            field_name = self.pop()
             self.expect(':')
             ty = self.parse_type()
             self.expect(';')
-            fields[name] = ty
+            fields[field_name] = ty
         self.expect('}')
-        return StructType(name, fields)
+        return StructType(fields)
 
     # Helper funcs
     def peek(self):
@@ -523,6 +563,9 @@ def ensure_path(path):
         pass
 def ensure_path_for(filepath):
     ensure_path(os.path.dirname(filepath))
+def write_file(filename, contents):
+    ensure_path_for(filename)
+    open(filename, 'w').write(contents)
 
 if __name__ == '__main__':
     try:

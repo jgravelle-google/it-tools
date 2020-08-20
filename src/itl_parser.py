@@ -165,6 +165,12 @@ def parse(body):
             assert(len(sexpr) == 2)
             expr = parse_expr(sexpr[1])
             return LowerRefExpr(expr)
+        elif head == 'read-field':
+            assert(len(sexpr) == 4)
+            record = sexpr[1]
+            field = sexpr[2]
+            expr = parse_expr(sexpr[3])
+            return ReadFieldExpr(record, field, expr)
         else:
             try:
                 n = int(sexpr)
