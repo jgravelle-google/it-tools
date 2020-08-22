@@ -21,6 +21,8 @@ the wasm module with adapter functions.
 The purpose of this script is to automate the bulk of writing ITL and C++
 annotations by hand.
 
+See: [CTL Reference](../design/ctl_reference.md)
+
 ### Arguments
 
 `python cpp_itl_generator.py INPUT.cpp [additional arguments]`
