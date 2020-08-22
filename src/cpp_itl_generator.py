@@ -71,8 +71,21 @@ def write_cpp(cpp_in, cpp_out):
         if not isinstance(struct, StructType):
             continue
         type_decls += 'struct ' + struct.name + ' {\n'
+        # fields
         for name, ty in struct.fields.items():
             type_decls += tab + '{} {};\n'.format(ty.to_cpp(), name)
+        # default constructor
+        type_decls += tab + '{}() {{}}\n'.format(struct.name)
+        # constructor w/ all fields initialized
+        args = ''
+        inits = ''
+        for name, ty in struct.fields.items():
+            if args:
+                args += ', '
+                inits += ', '
+            args += '{} _{}'.format(ty.to_cpp(), name)
+            inits += '{0}(_{0})'.format(name)
+        type_decls += tab + '{}({}) : {} {{}}\n'.format(struct.name, args, inits)
         type_decls += '};\n'
     h_contents = h_contents.replace('/**TYPE_DECLS**/', type_decls)
 
@@ -202,6 +215,13 @@ def write_itl(ast, wasm_out, itl_out):
             continue
         # TODO
         itl_contents += '(func _it_lift_{} "" (param i32) (result any)\n'.format(struct.name)
+        itl_contents += tab + '(make-record {}\n'.format(struct.name)
+        offset = 0
+        for name, ty in struct.fields.items():
+            load = '(load u32 wasm "memory" (+ {} (local 0)))'.format(offset)
+            itl_contents += tab*2 + '(field {} {})\n'.format(name, ty.lift(load, n_locals=2))
+            offset += ty.sizeof()
+        itl_contents += tab + ')\n'
         itl_contents += ')\n'
 
         itl_contents += '(func _it_lower_{} "" (param any) (result i32)\n'.format(struct.name)
@@ -352,7 +372,12 @@ class StructType(Type):
     def to_cpp(self):
         assert(self.name is not None)
         return self.name + '*'
+    def to_wasm(self):
+        return 'i32'
 
+    def lift(self, expr, n_locals):
+        assert(self.name is not None)
+        return '(call _it_lift_{} {})'.format(self.name, expr)
     def lower(self, expr, n_locals):
         assert(self.name is not None)
         return '(call _it_lower_{} {})'.format(self.name, expr)

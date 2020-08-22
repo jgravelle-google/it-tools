@@ -142,8 +142,18 @@ def parse(body):
             idx = parse_expr(sexpr[3])
             return TableReadExpr(mod, table, idx)
         elif head == 'make-record':
-            # TODO: implement
-            return UnreachableExpr()
+            assert(len(sexpr) >= 2)
+            ty = sexpr[1]
+            # fields are a list of pairs rather than a dict, to preserve the
+            # original order found in the source
+            fields = []
+            for sx in sexpr[2:]:
+                assert(len(sx) == 3)
+                assert(sx[0] == 'field')
+                field = sx[1]
+                expr = parse_expr(sx[2])
+                fields.append((field, expr))
+            return MakeRecordExpr(ty, fields)
         elif head == 'unreachable':
             assert(len(sexpr) == 1)
             return UnreachableExpr()
