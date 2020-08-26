@@ -181,6 +181,11 @@ def parse(body):
             field = sexpr[2]
             expr = parse_expr(sexpr[3])
             return ReadFieldExpr(record, field, expr)
+        elif head == 'construct-js':
+            assert(len(sexpr) >= 2)
+            kind = sexpr[1]
+            args = [parse_expr(ex) for ex in sexpr[2:]]
+            return ConstructJSExpr(kind, args)
         else:
             try:
                 n = int(sexpr)

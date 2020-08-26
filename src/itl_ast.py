@@ -417,3 +417,15 @@ class ReadFieldExpr(BaseExpr):
 
     def as_js(self):
         return '{}["{}"]'.format(self.expr.as_js(), self.field)
+
+class ConstructJSExpr(BaseExpr):
+    def __init__(self, kind, args):
+        self.kind = kind
+        self.args = args
+
+    def children(self):
+        return self.args
+
+    def as_js(self):
+        args = ', '.join(arg.as_js() for arg in self.args)
+        return '(new {}({}))'.format(self.kind, args)

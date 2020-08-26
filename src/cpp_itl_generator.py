@@ -207,6 +207,13 @@ def write_itl(ast, wasm_out, itl_out):
     (local 3)
 )
 
+(func _it_cppToF32Buffer "" (param i32) (result f32buffer)
+    ;; convert to Float32Array for WebGL reasons
+    (construct-js Float32Array
+        (call _it_cppToBuffer (local 0))
+    )
+)
+
 '''
 
     # adapters for structs
@@ -308,6 +315,7 @@ class SimpleType(Type):
         'any': 'void*',
         'void': 'void',
         'buffer': 'ITBuffer*',
+        'f32buffer': 'ITBuffer*',
     }
 
     def __init__(self, ty):
@@ -331,6 +339,8 @@ class SimpleType(Type):
             return '(call _it_cppToString {})'.format(expr)
         elif self.ty == 'buffer':
             return '(call _it_cppToBuffer  {})'.format(expr)
+        elif self.ty == 'f32buffer':
+            return '(call _it_cppToF32Buffer  {})'.format(expr)
         elif self.ty == 'any':
             return '(lift-ref {})'.format(expr)
         elif self.ty == 'void':
