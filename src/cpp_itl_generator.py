@@ -64,15 +64,6 @@ class CTLReader(object):
 
 
         # Write compute import+export declarations
-        import_decls = ''
-        for imp, funcs in self.ast.imports.items():
-            for func in funcs:
-                attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.name)
-                import_decls += attr + ' ' + func.to_cpp() + ';\n'
-        export_decls = ''
-        for func in self.ast.exports:
-            attr = '__attribute__((export_name("{}")))'.format(func.name)
-            export_decls += attr + ' ' + func.to_cpp() + ';\n'
         type_decls = ''
         for struct in self.ast.types.values():
             if not isinstance(struct, StructType):
@@ -94,7 +85,18 @@ class CTLReader(object):
                 inits += '{0}(_{0})'.format(name)
             type_decls += tab + '{}({}) : {} {{}}\n'.format(struct.name, args, inits)
             type_decls += '};\n'
-        self.it_decls = import_decls + export_decls + type_decls
+        import_decls = ''
+        for imp, funcs in self.ast.imports.items():
+            import_decls += 'namespace {} {{\n'.format(imp)
+            for func in funcs:
+                attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.name)
+                import_decls += tab + attr + ' ' + func.to_cpp() + ';\n'
+            import_decls += '}\n'
+        export_decls = ''
+        for func in self.ast.exports:
+            attr = '__attribute__((export_name("{}")))'.format(func.name)
+            export_decls += attr + ' ' + func.to_cpp() + ';\n'
+        self.it_decls = type_decls + import_decls + export_decls
 
     # Write output .cpp file
     def write_cpp(self, filename):
@@ -516,7 +518,6 @@ class Parser(object):
         for name, ty in self.types.items():
             if isinstance(ty, StructType):
                 ty.name = name
-        print("imports:", imports)
         return AST(imports, exports, self.types, cpp_extra)
 
     def add_import(self, imports, name, funcs):
@@ -526,14 +527,12 @@ class Parser(object):
             for fun in funcs:
                 for f in imports[name]:
                     if f.name == fun.name:
-                        print("OH GOODY", f.name)
                         break
                 else:
-                    print("OH WOW", fun.name)
                     imports[name].append(fun)
 
     def parse_import(self):
-        name = unquote(self.pop())
+        name = self.pop()
         self.expect('{')
         funcs = []
         while True:
