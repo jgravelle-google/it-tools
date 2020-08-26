@@ -46,14 +46,7 @@ public:
     FixedBuffer() : Buffer<T>(N) {}
 };
 
-// Types
-/**TYPE_DECLS**/
-
-// Imports
-/**IMPORT_DECLS**/
-
-// Exports
-/**EXPORT_DECLS**/
+/**IT_DECLS**/
 
 // Helper functions used in adapters
 __attribute__((export_name("_it_strlen")))

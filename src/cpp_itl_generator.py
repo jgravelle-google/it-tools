@@ -9,6 +9,7 @@ import traceback
 
 tab = '    '
 srcpath = os.path.dirname(__file__)
+search_paths = ['.']
 
 def main():
     arg_parser = argparse.ArgumentParser()
@@ -27,6 +28,7 @@ def main():
 
     # Paths
     cpp_in = args.cpp_in
+    search_paths.append(os.path.dirname(cpp_in))
     basename, _ = os.path.splitext(cpp_in)
     outpath = 'out' # default path for output files
     cpp_out = args.cpp_out
@@ -40,66 +42,67 @@ def main():
         # / instead of os.path.join because ITL expects / for paths
         wasm_out = outpath + '/' + basename + '.wasm'
 
-    ast = write_cpp(cpp_in, cpp_out)
-    write_itl(ast, wasm_out, itl_out)
+    ctl = CTLReader(cpp_in)
+    ctl.write_cpp(cpp_out)
+    write_itl(ctl.ast, wasm_out, itl_out)
 
-def write_cpp(cpp_in, cpp_out):
-    # read + parse
-    contents = open(cpp_in).read()
+class CTLReader(object):
     start_str, end_str = '/**IT_START**/', '/**IT_END**/'
-    start = contents.find(start_str) + len(start_str)
-    end = contents.find(end_str)
-    it_contents = contents[start:end]
-    ast = parse_it(it_contents)
+    def __init__(self, filename):
+        for path in search_paths:
+            pathname = os.path.join(path, filename)
+            if os.path.exists(pathname):
+                break
+        contents = open(pathname).read()
+        self.start = contents.find(CTLReader.start_str) + len(CTLReader.start_str)
+        self.end = contents.find(CTLReader.end_str)
+        self.it_contents = contents[self.start:self.end]
+        self.ast = parse_it(self.it_contents)
+        self.cpp_contents = (self.ast.cpp_extra +
+            contents[:self.start-len(CTLReader.start_str)] +
+            contents[self.end+len(CTLReader.end_str):])
 
-    # Write compute import+export declarations
-    template_path = os.path.join(srcpath, 'c_header_template.h')
-    h_contents = open(template_path).read()
-    import_decls = ''
-    for imp, funcs in ast.imports.items():
-        for func in funcs:
-            attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.name)
-            import_decls += attr + ' ' + func.to_cpp() + ';\n'
-    h_contents = h_contents.replace('/**IMPORT_DECLS**/', import_decls)
-    export_decls = ''
-    for func in ast.exports:
-        attr = '__attribute__((export_name("{}")))'.format(func.name)
-        export_decls += attr + ' ' + func.to_cpp() + ';\n'
-    h_contents = h_contents.replace('/**EXPORT_DECLS**/', export_decls)
-    type_decls = ''
-    for struct in ast.types.values():
-        if not isinstance(struct, StructType):
-            continue
-        type_decls += 'struct ' + struct.name + ' {\n'
-        # fields
-        for name, ty in struct.fields.items():
-            type_decls += tab + '{} {};\n'.format(ty.to_cpp(), name)
-        # default constructor
-        type_decls += tab + '{}() {{}}\n'.format(struct.name)
-        # constructor w/ all fields initialized
-        args = ''
-        inits = ''
-        for name, ty in struct.fields.items():
-            if args:
-                args += ', '
-                inits += ', '
-            args += '{} _{}'.format(ty.to_cpp(), name)
-            inits += '{0}(_{0})'.format(name)
-        type_decls += tab + '{}({}) : {} {{}}\n'.format(struct.name, args, inits)
-        type_decls += '};\n'
-    h_contents = h_contents.replace('/**TYPE_DECLS**/', type_decls)
+
+        # Write compute import+export declarations
+        import_decls = ''
+        for imp, funcs in self.ast.imports.items():
+            for func in funcs:
+                attr = '__attribute__((import_module("{}"), import_name("{}")))'.format(imp, func.name)
+                import_decls += attr + ' ' + func.to_cpp() + ';\n'
+        export_decls = ''
+        for func in self.ast.exports:
+            attr = '__attribute__((export_name("{}")))'.format(func.name)
+            export_decls += attr + ' ' + func.to_cpp() + ';\n'
+        type_decls = ''
+        for struct in self.ast.types.values():
+            if not isinstance(struct, StructType):
+                continue
+            type_decls += 'struct ' + struct.name + ' {\n'
+            # fields
+            for name, ty in struct.fields.items():
+                type_decls += tab + '{} {};\n'.format(ty.to_cpp(), name)
+            # default constructor
+            type_decls += tab + '{}() {{}}\n'.format(struct.name)
+            # constructor w/ all fields initialized
+            args = ''
+            inits = ''
+            for name, ty in struct.fields.items():
+                if args:
+                    args += ', '
+                    inits += ', '
+                args += '{} _{}'.format(ty.to_cpp(), name)
+                inits += '{0}(_{0})'.format(name)
+            type_decls += tab + '{}({}) : {} {{}}\n'.format(struct.name, args, inits)
+            type_decls += '};\n'
+        self.it_decls = import_decls + export_decls + type_decls
 
     # Write output .cpp file
-    cpp_contents = (
-        contents[:start-len(start_str)] +
-        h_contents +
-        # Add an include to the generated header file
-        # '#include "' + h_out + '"\n' +
-        contents[end+len(end_str):]
-    )
-    write_file(cpp_out, cpp_contents)
-
-    return ast
+    def write_cpp(self, filename):
+        template_path = os.path.join(srcpath, 'c_header_template.h')
+        h_contents = open(template_path).read()
+        h_contents = h_contents.replace('/**IT_DECLS**/', self.it_decls)
+        contents = h_contents + self.cpp_contents
+        write_file(filename, contents)
 
 def write_itl(ast, wasm_out, itl_out):
     # TODO: extract this AST -> ITL logic to a shared ItlWriter class (?)
@@ -249,10 +252,11 @@ float_types = ['f32', 'f64']
 numeric_types = integer_types + float_types
 
 class AST(object):
-    def __init__(self, imports, exports, types):
+    def __init__(self, imports, exports, types, cpp_extra):
         self.imports = imports
         self.exports = exports
         self.types = types
+        self.cpp_extra = cpp_extra
 
 class Func(object):
     def __init__(self, name, ty):
@@ -474,11 +478,11 @@ class Parser(object):
     def __init__(self, tokens):
         self.i = 0
         self.tokens = tokens
-        self.types = {}
 
     def parse(self):
         imports = {}
         exports = []
+        cpp_extra = ''
         self.types = {}
         while self.i < len(self.tokens):
             head = self.pop()
@@ -492,17 +496,41 @@ class Parser(object):
                         break
             elif head == 'import':
                 name, funcs = self.parse_import()
-                imports[name] = funcs
+                self.add_import(imports, name, funcs)
             elif head == 'type':
                 name = self.pop()
                 self.expect('=')
                 self.types[name] = self.parse_type()
+            elif head == 'include':
+                file = unquote(self.pop())
+                reader = CTLReader(file)
+                for k, v in reader.ast.imports.items():
+                    self.add_import(imports, k, v)
+                for ex in reader.ast.exports:
+                    exports.append(ex)
+                for k, v in reader.ast.types.items():
+                    self.types[k] = v
+                cpp_extra += reader.cpp_contents
             else:
                 assert False, 'unknown top-level stmt'
         for name, ty in self.types.items():
             if isinstance(ty, StructType):
                 ty.name = name
-        return AST(imports, exports, self.types)
+        print("imports:", imports)
+        return AST(imports, exports, self.types, cpp_extra)
+
+    def add_import(self, imports, name, funcs):
+        if name not in imports:
+            imports[name] = funcs
+        else:
+            for fun in funcs:
+                for f in imports[name]:
+                    if f.name == fun.name:
+                        print("OH GOODY", f.name)
+                        break
+                else:
+                    print("OH WOW", fun.name)
+                    imports[name].append(fun)
 
     def parse_import(self):
         name = unquote(self.pop())
