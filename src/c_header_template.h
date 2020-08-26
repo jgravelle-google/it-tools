@@ -5,7 +5,7 @@
 // Buffer data type for passing ArrayBuffers in and out.
 // Does not manage the underlying buffer; defers that to a higher level.
 class ITBuffer {
-    int size;
+    int size; // size of the buffer in bytes
 protected:
     void* data;
 public:
@@ -21,16 +21,15 @@ public:
 // ITBuffer - probably passed in from an import.
 template <typename T>
 class Buffer : public ITBuffer {
-    int count;
+    int count; // number of elements
+    bool owned; // whether Buffer is responsible for freeing the memory
 public:
-    Buffer(int n) : ITBuffer(n * sizeof(T), new T[n * sizeof(T)]), count(n) {}
-    Buffer() : ITBuffer(0, nullptr), count(0) {}
-    // ITBuffers are unmanaged, so the destructor shouldn't double-free if we
-    // take ownership of one.
-    Buffer(ITBuffer* buffer, int n) : ITBuffer(n * sizeof(T), buffer->rawBuffer()) {}
+    Buffer(int n) : ITBuffer(n * sizeof(T), new T[n * sizeof(T)]), count(n), owned(true) {}
+    Buffer() : ITBuffer(0, nullptr), count(0), owned(false) {}
+    Buffer(int n, void* data) : ITBuffer(n * sizeof(T), data), count(n), owned(false) {}
 
     ~Buffer() {
-        if (data) {
+        if (owned) {
             delete[] (T*)data;
         }
     }
