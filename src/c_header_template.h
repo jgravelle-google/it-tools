@@ -5,7 +5,8 @@
 // Buffer data type for passing ArrayBuffers in and out.
 // Does not manage the underlying buffer; defers that to a higher level.
 class ITBuffer {
-    int size; // size of the buffer in bytes
+    // size of the buffer in bytes; volatile to silence unused warning
+    volatile int size;
 protected:
     void* data;
 public:
@@ -26,7 +27,7 @@ class Buffer : public ITBuffer {
 public:
     Buffer(int n) : ITBuffer(n * sizeof(T), new T[n * sizeof(T)]), count(n), owned(true) {}
     Buffer() : ITBuffer(0, nullptr), count(0), owned(false) {}
-    Buffer(int n, void* data) : ITBuffer(n * sizeof(T), data), count(n), owned(false) {}
+    Buffer(int n, void* _data) : ITBuffer(n * sizeof(T), _data), count(n), owned(false) {}
 
     ~Buffer() {
         if (owned) {
@@ -37,13 +38,22 @@ public:
     inline T& operator[](int idx) {
         return ((T*)data)[idx];
     }
+    inline T const& operator[](int idx) const {
+        return ((T*)data)[idx];
+    }
 };
+
+#include <string.h>
 
 // Fixed-size buffer
 template <typename T, int N>
 class FixedBuffer : public Buffer<T> {
+    T items[N];
 public:
-    FixedBuffer() : Buffer<T>(N) {}
+    FixedBuffer() : Buffer<T>(N, items) {}
+    FixedBuffer(T const _items[N]) : Buffer<T>(N, items) {
+        memcpy(items, _items, N*sizeof(T));
+    }
 };
 
 /**IT_DECLS**/
