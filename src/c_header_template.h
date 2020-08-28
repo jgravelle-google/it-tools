@@ -25,9 +25,20 @@ class Buffer : public ITBuffer {
     int count; // number of elements
     bool owned; // whether Buffer is responsible for freeing the memory
 public:
-    Buffer(int n) : ITBuffer(n * sizeof(T), new T[n * sizeof(T)]), count(n), owned(true) {}
+    Buffer(int n) : ITBuffer(n * sizeof(T), new T[n]), count(n), owned(true) {}
     Buffer() : ITBuffer(0, nullptr), count(0), owned(false) {}
     Buffer(int n, void* _data) : ITBuffer(n * sizeof(T), _data), count(n), owned(false) {}
+
+    Buffer(Buffer& other) : ITBuffer(other.count * sizeof(T), nullptr), 
+            count(other.count), owned(other.owned) {
+        if (other.owned) {
+            data = new T[count];
+            memcpy(data, other.data, count*sizeof(T));
+        } else {
+            data = other.data;
+        }
+    }
+    Buffer(Buffer&& other) = default;
 
     ~Buffer() {
         if (owned) {
@@ -53,6 +64,13 @@ public:
     FixedBuffer() : Buffer<T>(N, items) {}
     FixedBuffer(T const _items[N]) : Buffer<T>(N, items) {
         memcpy(items, _items, N*sizeof(T));
+    }
+
+    FixedBuffer(FixedBuffer& other) : FixedBuffer(other.items) {}
+    FixedBuffer(FixedBuffer&& other) = default;
+    FixedBuffer& operator=(FixedBuffer other) {
+        memcpy(items, other.items, N*sizeof(T));
+        return *this;
     }
 };
 

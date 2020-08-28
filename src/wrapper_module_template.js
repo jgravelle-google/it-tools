@@ -45,6 +45,10 @@ const /**COMPONENT_NAME**/ = {
             return refArray[idx];
         }
         function lowerRef(ref) {
+            if (!ref) {
+                // null refs can be valid; return as 0
+                return 0;
+            }
             if (!refToIdx.has(ref)) {
                 refToIdx.set(ref, refArray.length);
                 refArray.push(ref);
