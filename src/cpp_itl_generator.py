@@ -440,15 +440,14 @@ class ArrayType(Type):
         return 'i32'
 
     def lift(self, expr, n_locals):
-        # args are: type, stride, ptr, count, body
+        size = self.ty.sizeof()
         if isinstance(self.ty, SimpleType):
-            size = self.ty.sizeof()
             body = '(load {} wasm "memory" (local {}))'.format(
                 self.ty.to_wasm(), n_locals)
         else:
-            # structs are passed by pointer, so don't use inline size
-            size = 4
-            body = '(load u32 wasm "memory" (local {}))'.format(n_locals)
+            # structs are passed inline with the array memory, so no need to load
+            body = '(local {})'.format(n_locals)
+        # args are: type, stride, ptr, count, body
         return ('(lift-array {} {} '.format(self.ty.to_it(), size) +
             '(load u32 wasm "memory" (+ {} 4)) '.format(expr) +
             '(/ (load u32 wasm "memory" {}) {}) '.format(expr, size) +
