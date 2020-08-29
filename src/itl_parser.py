@@ -116,7 +116,7 @@ def parse(body):
             ptr = parse_expr(sexpr[4])
             return BufferToMemExpr(mod, mem, buff, ptr)
         elif head == 'load':
-            assert len(sexpr) == 5
+            assert len(sexpr) == 5, sexpr
             ty = sexpr[1]
             mod = sexpr[2]
             mem = unquote(sexpr[3])
@@ -134,7 +134,12 @@ def parse(body):
             assert(len(sexpr) == 3)
             lhs = parse_expr(sexpr[1])
             rhs = parse_expr(sexpr[2])
-            return AddExpr(lhs, rhs)
+            return BinaryExpr(lhs, rhs, '+', 'i32.add')
+        elif head == '/':
+            assert(len(sexpr) == 3)
+            lhs = parse_expr(sexpr[1])
+            rhs = parse_expr(sexpr[2])
+            return BinaryExpr(lhs, rhs, '/', 'i32.div_s')
         elif head == 'table-read':
             assert(len(sexpr) == 4)
             mod = sexpr[1]
@@ -181,11 +186,14 @@ def parse(body):
             field = sexpr[2]
             expr = parse_expr(sexpr[3])
             return ReadFieldExpr(record, field, expr)
-        elif head == 'construct-js':
-            assert(len(sexpr) >= 2)
-            kind = sexpr[1]
-            args = [parse_expr(ex) for ex in sexpr[2:]]
-            return ConstructJSExpr(kind, args)
+        elif head == 'lift-array':
+            assert(len(sexpr) == 6)
+            ty = sexpr[1]
+            stride = sexpr[2]
+            ptr = parse_expr(sexpr[3])
+            length = parse_expr(sexpr[4])
+            body = parse_expr(sexpr[5])
+            return LiftArrayExpr(ty, stride, ptr, length, body, num_locals)
         else:
             try:
                 n = int(sexpr)

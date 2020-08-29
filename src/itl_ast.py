@@ -241,9 +241,8 @@ class LoadExpr(BaseExpr):
         return self.load_ty
 
     def as_js(self):
-        assert self.load_ty == 'u32'
-        return '(new Uint32Array({}["{}"].buffer))[{} >> 2]'.format(
-            self.module, self.memory, self.ptr.as_js())
+        return '(new arrayTypes["{}"]({}["{}"].buffer))[{} >> 2]'.format(
+            self.load_ty, self.module, self.memory, self.ptr.as_js())
 
 class StoreExpr(BaseExpr):
     def __init__(self, store_ty, module, memory, ptr, expr):
@@ -300,6 +299,21 @@ class BufferToMemExpr(BaseExpr):
     def as_js(self):
         return 'bufferToMem({}["{}"], {}, {})'.format(
             self.module, self.memory, self.buff.as_js(), self.ptr.as_js())
+
+class BinaryExpr(BaseExpr):
+    def __init__(self, lhs, rhs, js_op, wat_op):
+        self.lhs = lhs
+        self.rhs = rhs
+        self.js_op = js_op
+        self.wat_op = wat_op
+
+    def children(self):
+        return [self.lhs, self.rhs]
+
+    def as_js(self):
+        return '({} {} {})'.format(self.lhs.as_js(), self.js_op, self.rhs.as_js())
+    def as_wat(self):
+        return '({} {} {})'.format(self.wat_op, self.lhs.as_wat(), self.rhs.as_wat())
 
 class AddExpr(BaseExpr):
     def __init__(self, lhs, rhs):
@@ -418,14 +432,18 @@ class ReadFieldExpr(BaseExpr):
     def as_js(self):
         return '{}["{}"]'.format(self.expr.as_js(), self.field)
 
-class ConstructJSExpr(BaseExpr):
-    def __init__(self, kind, args):
-        self.kind = kind
-        self.args = args
+class LiftArrayExpr(BaseExpr):
+    def __init__(self, ty, stride, ptr, length, body, num_locals):
+        self.ty = ty
+        self.stride = stride
+        self.ptr = ptr
+        self.length = length
+        self.body = body
+        self.num_locals = num_locals
 
     def children(self):
-        return self.args
+        return [self.ptr, self.length, self.body]
 
     def as_js(self):
-        args = ', '.join(arg.as_js() for arg in self.args)
-        return '(new {}({}))'.format(self.kind, args)
+        return 'liftArray("{}", {}, {}, {}, (x{}) => {})'.format(
+            self.ty, self.stride, self.ptr.as_js(), self.length.as_js(), self.num_locals, self.body.as_js())

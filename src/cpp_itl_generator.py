@@ -212,13 +212,6 @@ def write_itl(ast, wasm_out, itl_out):
     (local 3)
 )
 
-(func _it_cppToF32Buffer "" (param i32) (result f32buffer)
-    ;; convert to Float32Array for WebGL reasons
-    (construct-js Float32Array
-        (call _it_cppToBuffer (local 0))
-    )
-)
-
 '''
 
     # adapters for structs
@@ -321,7 +314,6 @@ class SimpleType(Type):
         'any': 'void*',
         'void': 'void',
         'buffer': 'ITBuffer*',
-        'f32buffer': 'ITBuffer*',
     }
 
     def __init__(self, ty):
@@ -334,9 +326,10 @@ class SimpleType(Type):
     def to_cpp(self):
         return SimpleType.mapping[self.ty]
     def to_wasm(self):
-        if self.ty == 'void':
-            return ''
-        return 'i32'
+        return {
+            'void': '',
+            'f32': 'f32',
+        }.get(self.ty, 'i32')
 
     def lift(self, expr, n_locals):
         if self.ty in numeric_types:
@@ -345,8 +338,6 @@ class SimpleType(Type):
             return '(call _it_cppToString {})'.format(expr)
         elif self.ty == 'buffer':
             return '(call _it_cppToBuffer  {})'.format(expr)
-        elif self.ty == 'f32buffer':
-            return '(call _it_cppToF32Buffer  {})'.format(expr)
         elif self.ty == 'any':
             return '(lift-ref {})'.format(expr)
         elif self.ty == 'void':
@@ -371,7 +362,10 @@ class SimpleType(Type):
         assert False
 
     def sizeof(self):
-        # TODO
+        if self.ty in ['u1', 's8', 'u8']:
+            return 1
+        elif self.ty in ['u16', 's16']:
+            return 2
         return 4
 
 class StructType(Type):
@@ -432,6 +426,27 @@ class FuncType(Type):
             args += arg.lower('(local {})'.format(n_locals + i), n_locals + len(self.args))
         return '(lambda {} (call-expr {} {}))'.format(
             self.to_it(), fn, args)
+
+class ArrayType(Type):
+    def __init__(self, ty):
+        assert(isinstance(ty, Type))
+        self.ty = ty
+
+    def to_it(self):
+        return '(array {})'.format(self.ty.to_it())
+    def to_cpp(self):
+        return 'ITBuffer*'
+    def to_wasm(self):
+        return 'i32'
+
+    def lift(self, expr, n_locals):
+        # args are: type, stride, ptr, count, body
+        return ('(lift-array {} {} '.format(self.ty.to_it(), self.ty.sizeof()) +
+            '(load u32 wasm "memory" (+ {} 4)) '.format(expr) +
+            '(/ (load u32 wasm "memory" {}) {}) '.format(expr, self.ty.sizeof()) +
+            self.ty.lift('(load {} wasm "memory" (local {}))'.format(
+                self.ty.to_wasm(), n_locals), n_locals+1) +
+        ')')
 
 def parse_it(contents):
     tokens = Lexer(contents).lex()
@@ -557,6 +572,11 @@ class Parser(object):
             return self.parse_func_type()
         elif kind == 'struct':
             return self.parse_struct()
+        elif kind == 'array':
+            self.expect('(')
+            ty = self.parse_type()
+            self.expect(')')
+            return ArrayType(ty)
         elif kind in self.types:
             return self.types[kind]
         else:

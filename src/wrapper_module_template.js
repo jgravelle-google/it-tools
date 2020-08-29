@@ -35,6 +35,24 @@ const /**COMPONENT_NAME**/ = {
             let b8 = new Uint8Array(buffer);
             u8.set(b8, ptr);
         }
+        let arrayTypes = {
+            'u1': Uint8Array,
+            'u8': Uint8Array,
+            'i8': Int8Array,
+            'i16': Int16Array,
+            'u16': Uint16Array,
+            'i32': Int32Array,
+            'u32': Uint32Array,
+            'f32': Float32Array,
+        };
+        function liftArray(ty, stride, ptr, len, body) {
+            let constructor = arrayTypes[ty] || Array;
+            let ret = new constructor(len);
+            for (let i = 0; i < len; ++i) {
+                ret[i] = body(ptr + i*stride);
+            }
+            return ret;
+        }
 
         // References
         // first elem is null so we avoid assigning 0 as a valid index
