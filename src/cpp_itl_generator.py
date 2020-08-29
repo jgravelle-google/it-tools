@@ -441,11 +441,18 @@ class ArrayType(Type):
 
     def lift(self, expr, n_locals):
         # args are: type, stride, ptr, count, body
-        return ('(lift-array {} {} '.format(self.ty.to_it(), self.ty.sizeof()) +
+        if isinstance(self.ty, SimpleType):
+            size = self.ty.sizeof()
+            body = '(load {} wasm "memory" (local {}))'.format(
+                self.ty.to_wasm(), n_locals)
+        else:
+            # structs are passed by pointer, so don't use inline size
+            size = 4
+            body = '(load u32 wasm "memory" (local {}))'.format(n_locals)
+        return ('(lift-array {} {} '.format(self.ty.to_it(), size) +
             '(load u32 wasm "memory" (+ {} 4)) '.format(expr) +
-            '(/ (load u32 wasm "memory" {}) {}) '.format(expr, self.ty.sizeof()) +
-            self.ty.lift('(load {} wasm "memory" (local {}))'.format(
-                self.ty.to_wasm(), n_locals), n_locals+1) +
+            '(/ (load u32 wasm "memory" {}) {}) '.format(expr, size) +
+            self.ty.lift(body, n_locals+1) +
         ')')
 
 def parse_it(contents):
