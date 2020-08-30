@@ -65,26 +65,8 @@ class CTLReader(object):
 
         # Write compute import+export declarations
         type_decls = ''
-        for struct in self.ast.types.values():
-            if not isinstance(struct, StructType):
-                continue
-            type_decls += 'struct ' + struct.name + ' {\n'
-            # fields
-            for name, ty in struct.fields.items():
-                type_decls += tab + '{} {};\n'.format(ty.to_cpp(), name)
-            # default constructor
-            type_decls += tab + '{}() {{}}\n'.format(struct.name)
-            # constructor w/ all fields initialized
-            args = ''
-            inits = ''
-            for name, ty in struct.fields.items():
-                if args:
-                    args += ', '
-                    inits += ', '
-                args += '{} _{}'.format(ty.to_cpp(), name)
-                inits += '{0}(_{0})'.format(name)
-            type_decls += tab + '{}({}) : {} {{}}\n'.format(struct.name, args, inits)
-            type_decls += '};\n'
+        for ty in self.ast.types.values():
+            type_decls += ty.cpp_type_decl()
         import_decls = ''
         for imp, funcs in self.ast.imports.items():
             import_decls += 'namespace {} {{\n'.format(imp)
@@ -112,11 +94,8 @@ def write_itl(ast, wasm_out, itl_out):
 
     # ITL Types
     itl_contents += '(types\n'
-    for struct in ast.types.values():
-        itl_contents += tab + '(record {}\n'.format(struct.name)
-        for name, ty in struct.fields.items():
-            itl_contents += tab * 2 + '({} {})\n'.format(name, ty.to_it())
-        itl_contents += tab + ')\n'
+    for ty in ast.types.values():
+        itl_contents += ty.itl_type_decl()
     itl_contents += ')\n'
 
     # ITL Imports
@@ -214,31 +193,9 @@ def write_itl(ast, wasm_out, itl_out):
 
 '''
 
-    # adapters for structs
-    for struct in ast.types.values():
-        if not isinstance(struct, StructType):
-            continue
-        # TODO
-        itl_contents += '(func _it_lift_{} "" (param i32) (result any)\n'.format(struct.name)
-        itl_contents += tab + '(make-record {}\n'.format(struct.name)
-        offset = 0
-        for name, ty in struct.fields.items():
-            load = '(load u32 wasm "memory" (+ {} (local 0)))'.format(offset)
-            itl_contents += tab*2 + '(field {} {})\n'.format(name, ty.lift(load, n_locals=2))
-            offset += ty.sizeof()
-        itl_contents += tab + ')\n'
-        itl_contents += ')\n'
-
-        itl_contents += '(func _it_lower_{} "" (param any) (result i32)\n'.format(struct.name)
-        itl_contents += tab + '(let (call _it_malloc {}))\n'.format(struct.sizeof())
-        offset = 0
-        for name, ty in struct.fields.items():
-            read = '(read-field {} {} (local 0))'.format(struct.name, name)
-            itl_contents += tab + '(store u32 wasm "memory" (+ {} (local 1)) {})\n'.format(
-                offset, ty.lower(read, n_locals=2))
-            offset += ty.sizeof()
-        itl_contents += tab + '(local 1)\n'
-        itl_contents += ')\n'
+    # adapter functions for structs
+    for ty in ast.types.values():
+        itl_contents += ty.itl_adapter_funcs()
 
     write_file(itl_out, itl_contents)
 
@@ -369,27 +326,21 @@ class SimpleType(Type):
         return 4
 
 class StructType(Type):
-    def __init__(self, fields):
+    def __init__(self, name, fields):
         self.fields = fields
-        # this is silly; structs need to be named, but leaving space for
-        # `type foo = struct {...}` syntax makes parsing awkward
-        # so set a name here to backfill later
-        self.name = None
+        assert name is not None
+        self.name = name
 
     def to_it(self):
-        assert(self.name is not None)
         return self.name
     def to_cpp(self):
-        assert(self.name is not None)
         return self.name + '*'
     def to_wasm(self):
         return 'i32'
 
     def lift(self, expr, n_locals):
-        assert(self.name is not None)
         return '(call _it_lift_{} {})'.format(self.name, expr)
     def lower(self, expr, n_locals):
-        assert(self.name is not None)
         return '(call _it_lower_{} {})'.format(self.name, expr)
 
     def sizeof(self):
@@ -397,6 +348,116 @@ class StructType(Type):
         for ty in self.fields.values():
             size += ty.sizeof()
         return size
+
+    def itl_type_decl(self):
+        ret = tab + '(record {}\n'.format(self.name)
+        for name, ty in self.fields.items():
+            ret += tab * 2 + '({} {})\n'.format(name, ty.to_it())
+        ret += tab + ')\n'
+        return ret
+    def itl_adapter_funcs(self):
+        ret = '(func _it_lift_{} "" (param i32) (result any)\n'.format(self.name)
+        ret += tab + '(make-record {}\n'.format(self.name)
+        offset = 0
+        for name, ty in self.fields.items():
+            load = '(load u32 wasm "memory" (+ {} (local 0)))'.format(offset)
+            ret += tab*2 + '(field {} {})\n'.format(name, ty.lift(load, n_locals=2))
+            offset += ty.sizeof()
+        ret += tab + ')\n'
+        ret += ')\n'
+
+        ret += '(func _it_lower_{} "" (param any) (result i32)\n'.format(self.name)
+        ret += tab + '(let (call _it_malloc {}))\n'.format(self.sizeof())
+        offset = 0
+        for name, ty in self.fields.items():
+            read = '(read-field {} {} (local 0))'.format(self.name, name)
+            ret += tab + '(store u32 wasm "memory" (+ {} (local 1)) {})\n'.format(
+                offset, ty.lower(read, n_locals=2))
+            offset += ty.sizeof()
+        ret += tab + '(local 1)\n'
+        ret += ')\n'
+        return ret
+    def cpp_type_decl(self):
+        ret = 'struct ' + self.name + ' {\n'
+        # fields
+        for name, ty in self.fields.items():
+            ret += tab + '{} {};\n'.format(ty.to_cpp(), name)
+        # default constructor
+        ret += tab + '{}() {{}}\n'.format(self.name)
+        # constructor w/ all fields initialized
+        args = ''
+        inits = ''
+        for name, ty in self.fields.items():
+            if args:
+                args += ', '
+                inits += ', '
+            args += '{} _{}'.format(ty.to_cpp(), name)
+            inits += '{0}(_{0})'.format(name)
+        ret += tab + '{}({}) : {} {{}}\n'.format(self.name, args, inits)
+        ret += '};\n'
+        return ret
+
+class VariantType(Type):
+    def __init__(self, name, kinds):
+        assert name is not None
+        self.name = name
+        self.kinds = kinds
+
+    def to_it(self):
+        return self.name
+    def to_cpp(self):
+        return self.name + '*'
+    def to_wasm(self):
+        return 'i32'
+
+    def lift(self, expr, n_locals):
+        return '(call _it_lift_{} {})'.format(self.name, expr)
+    def lower(self, expr, n_locals):
+        return '(call _it_lower_{} {})'.format(self.name, expr)
+
+    def sizeof(self):
+        # the variant itself is always just a pointer (to a struct)
+        return 4
+
+    def itl_type_decl(self):
+        # TODO
+        return ''
+    def itl_adapter_funcs(self):
+        # TODO
+        return ''
+    def cpp_type_decl(self):
+        # base class
+        ret = 'class {} {{\n'.format(self.name)
+        ret += 'protected:\n'
+        ret += tab + 'enum _Kind {\n'
+        for struct in self.kinds.values():
+            ret += tab * 2 + struct.name + ',\n'
+        ret += tab + '};\n'
+        ret += tab + 'volatile _Kind kind;\n'
+        ret += 'public:\n'
+        ret += tab + self.name + '(_Kind _kind) : kind(_kind) {}\n'
+        ret += '};\n'
+
+        # sublcasses
+        for struct in self.kinds.values():
+            ret += 'struct {} : public {} {{\n'.format(struct.name, self.name)
+            # fields
+            for name, ty in struct.fields.items():
+                ret += tab + '{} {};\n'.format(ty.to_cpp(), name)
+            # constructor w/ all fields initialized
+            args = ''
+            inits = ''
+            for name, ty in struct.fields.items():
+                if args:
+                    args += ', '
+                    inits += ', '
+                args += '{} _{}'.format(ty.to_cpp(), name)
+                inits += '{0}(_{0})'.format(name)
+            # base class constructor with _Kind enum set
+            base = '{0}({0}::{1})'.format(self.name, struct.name)
+            ret += tab + '{}({}) : {}, {} {{}}\n'.format(struct.name, args, base, inits)
+            ret += '};\n'
+        return ret
 
 class FuncType(Type):
     def __init__(self, args, ret):
@@ -523,7 +584,7 @@ class Parser(object):
             elif head == 'type':
                 name = self.pop()
                 self.expect('=')
-                self.types[name] = self.parse_type()
+                self.types[name] = self.parse_type(name)
             elif head == 'include':
                 file = unquote(self.pop())
                 reader = CTLReader(file)
@@ -536,9 +597,6 @@ class Parser(object):
                 cpp_extra += reader.cpp_contents
             else:
                 assert False, 'unknown top-level stmt'
-        for name, ty in self.types.items():
-            if isinstance(ty, StructType):
-                ty.name = name
         return AST(imports, exports, self.types, cpp_extra)
 
     def add_import(self, imports, name, funcs):
@@ -572,12 +630,15 @@ class Parser(object):
         self.expect(';')
         return Func(name, ty)
 
-    def parse_type(self):
+    def parse_type(self, name=None):
         kind = self.pop()
         if kind == 'func':
             return self.parse_func_type()
         elif kind == 'struct':
-            return self.parse_struct()
+            fields = self.parse_struct_body()
+            return StructType(name, fields)
+        elif kind == 'variant':
+            return self.parse_variant(name)
         elif kind == 'array':
             self.expect('(')
             ty = self.parse_type()
@@ -607,8 +668,9 @@ class Parser(object):
             ret = SimpleType('void')
         return FuncType(args, ret)
 
-    def parse_struct(self):
-        # assume we've popped `struct`, as the identifier
+    def parse_struct_body(self):
+        # parses the body of a struct declaration between {}s
+        # also used for variant branches
         self.expect('{')
         fields = {}
         while self.peek() != '}':
@@ -618,7 +680,17 @@ class Parser(object):
             self.expect(';')
             fields[field_name] = ty
         self.expect('}')
-        return StructType(fields)
+        return fields
+
+    def parse_variant(self, name):
+        self.expect('{')
+        kinds = {}
+        while self.peek() != '}':
+            kind_name = self.pop()
+            fields = self.parse_struct_body()
+            kinds[kind_name] = StructType(kind_name, fields)
+        self.expect('}')
+        return VariantType(name, kinds)
 
     # Helper funcs
     def peek(self):
