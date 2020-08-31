@@ -231,11 +231,12 @@ class Func(object):
         contents = tab * 2 + '(func _it_{} "{}" (param {}) (result {})\n'.format(
             self.name, self.name, args, ret)
         args = ''
+        n_locals = len(self.ty.args)
         for i, arg in enumerate(self.ty.args):
             local = '(local {})'.format(i)
-            args += '\n' + tab * 4 + arg.lift(local, n_locals=len(self.ty.args))
-        call = '(call {}{})'.format(self.name, args)
-        body = self.ty.ret.lower(call, n_locals=len(self.ty.args))
+            args += '\n' + tab * 4 + arg.lift(local, n_locals+1)
+        contents += tab * 3 + '(let (call {}{}))\n'.format(self.name, args)
+        body = self.ty.ret.lower('(local {})'.format(n_locals), n_locals)
         contents += tab * 3 + body + ')\n'
         return contents
     def to_itl_export(self):
@@ -243,11 +244,12 @@ class Func(object):
         contents = tab + '(func _it_{} "{}" (param {}) (result {})\n'.format(
             self.name, self.name, ' '.join([ty.to_it() for ty in self.ty.args]), ret)
         args = ''
+        n_locals = len(self.ty.args)
         for i, arg in enumerate(self.ty.args):
             local = '(local {})'.format(i)
-            args += '\n' + tab * 3 + arg.lower(local, n_locals=len(self.ty.args))
-        call = '(call {}{})'.format(self.name, args)
-        body = self.ty.ret.lift(call, n_locals=len(self.ty.args))
+            args += '\n' + tab * 3 + arg.lower(local, n_locals+1)
+        contents += tab * 2 + '(let (call {}{}))\n'.format(self.name, args)
+        body = self.ty.ret.lift('(local {})'.format(n_locals), n_locals)
         contents += tab * 2 + body + '\n'
         contents += tab + ')\n'
         return contents
