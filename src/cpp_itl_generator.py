@@ -236,7 +236,7 @@ class Func(object):
             local = '(local {})'.format(i)
             args += '\n' + tab * 4 + arg.lift(local, n_locals+1)
         contents += tab * 3 + '(let (call {}{}))\n'.format(self.name, args)
-        body = self.ty.ret.lower('(local {})'.format(n_locals), n_locals)
+        body = self.ty.ret.lower('(local {})'.format(n_locals), n_locals+1)
         contents += tab * 3 + body + ')\n'
         return contents
     def to_itl_export(self):
@@ -249,7 +249,7 @@ class Func(object):
             local = '(local {})'.format(i)
             args += '\n' + tab * 3 + arg.lower(local, n_locals+1)
         contents += tab * 2 + '(let (call {}{}))\n'.format(self.name, args)
-        body = self.ty.ret.lift('(local {})'.format(n_locals), n_locals)
+        body = self.ty.ret.lift('(local {})'.format(n_locals), n_locals+1)
         contents += tab * 2 + body + '\n'
         contents += tab + ')\n'
         return contents
