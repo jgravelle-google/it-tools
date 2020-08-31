@@ -2,12 +2,15 @@
 // guard against multiple declarations of this header
 #define __IT_HEADER_PREFIX__
 
+#include <string>
+#include <vector>
+
 // Buffer data type for passing ArrayBuffers in and out.
 // Does not manage the underlying buffer; defers that to a higher level.
 class ITBuffer {
+protected:
     // size of the buffer in bytes; volatile to silence unused warning
     volatile int size;
-protected:
     void* data;
 public:
     ITBuffer(int n, void* d) : size(n), data(d) {}
@@ -28,6 +31,9 @@ public:
     Buffer(int n) : ITBuffer(n * sizeof(T), new T[n]), count(n), owned(true) {}
     Buffer() : ITBuffer(0, nullptr), count(0), owned(false) {}
     Buffer(int n, void* _data) : ITBuffer(n * sizeof(T), _data), count(n), owned(false) {}
+    Buffer(std::vector<T> const& vec) : Buffer(vec.size()) {
+        memcpy(data, vec.data(), size);
+    }
 
     Buffer(Buffer& other) : ITBuffer(other.count * sizeof(T), nullptr), 
             count(other.count), owned(other.owned) {
@@ -53,8 +59,6 @@ public:
         return ((T*)data)[idx];
     }
 };
-
-#include <string.h>
 
 // Fixed-size buffer
 template <typename T, int N>
