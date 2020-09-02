@@ -327,6 +327,19 @@ class SimpleType(Type):
             return 2
         return 4
 
+    def it_store_expr(self, ptr, val):
+        if self.ty in ['buffer', 'string']:
+            ty = 'u32'
+        else:
+            ty = self.ty
+        return '(store {} wasm "memory" {} {})'.format(ty, ptr, val)
+    def it_load_expr(self, ptr):
+        if self.ty in ['buffer', 'string']:
+            ty = 'u32'
+        else:
+            ty = self.ty
+        return '(load {} wasm "memory" {})'.format(ty, ptr)
+
 class StructType(Type):
     def __init__(self, name, fields):
         self.fields = fields
@@ -362,7 +375,8 @@ class StructType(Type):
         ret += tab + '(make-record {}\n'.format(self.name)
         offset = 0
         for name, ty in self.fields.items():
-            load = '(load u32 wasm "memory" (+ {} (local 0)))'.format(offset)
+            ptr = '(+ {} (local 0))'.format(offset)
+            load = ty.it_load_expr(ptr)
             ret += tab*2 + '(field {} {})\n'.format(name, ty.lift(load, n_locals=2))
             offset += ty.sizeof()
         ret += tab + ')\n'
@@ -373,8 +387,9 @@ class StructType(Type):
         offset = 0
         for name, ty in self.fields.items():
             read = '(read-field {} {} (local 0))'.format(self.name, name)
-            ret += tab + '(store u32 wasm "memory" (+ {} (local 1)) {})\n'.format(
-                offset, ty.lower(read, n_locals=2))
+            ptr = '(+ {} (local 1))'.format(offset)
+            val = ty.lower(read, n_locals=2)
+            ret += tab + ty.it_store_expr(ptr, val) + '\n'
             offset += ty.sizeof()
         ret += tab + '(local 1)\n'
         ret += ')\n'
@@ -506,7 +521,7 @@ class ArrayType(Type):
         size = self.ty.sizeof()
         if isinstance(self.ty, SimpleType):
             body = '(load {} wasm "memory" (local {}))'.format(
-                self.ty.to_wasm(), n_locals)
+                self.ty.to_it(), n_locals)
         else:
             # structs are passed inline with the array memory, so no need to load
             body = '(local {})'.format(n_locals)

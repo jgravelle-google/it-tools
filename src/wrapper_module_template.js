@@ -37,13 +37,15 @@ const /**COMPONENT_NAME**/ = {
         }
         let arrayTypes = {
             'u1': Uint8Array,
+            's8': Int8Array,
             'u8': Uint8Array,
-            'i8': Int8Array,
-            'i16': Int16Array,
+            's16': Int16Array,
             'u16': Uint16Array,
-            'i32': Int32Array,
+            's32': Int32Array,
             'u32': Uint32Array,
             'f32': Float32Array,
+
+            'i32': Int32Array,
         };
         function liftArray(ty, stride, ptr, len, body) {
             let constructor = arrayTypes[ty] || Array;

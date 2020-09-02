@@ -230,6 +230,21 @@ class StringLenExpr(BaseExpr):
     def as_wat(self):
         return '(call $_it_string_len {})'.format(self.expr.as_wat())
 
+shift_sizes = {
+    # IT types
+    'u1': 0,
+    's8': 0,
+    'u8': 0,
+    's16': 1,
+    'u16': 1,
+    's32': 2,
+    'u32': 2,
+    'f32': 2,
+
+    # wasm types; floats alias w/ IT
+    'i32': 2,
+}
+
 class LoadExpr(BaseExpr):
     def __init__(self, load_ty, module, memory, ptr):
         self.load_ty = load_ty
@@ -241,8 +256,9 @@ class LoadExpr(BaseExpr):
         return self.load_ty
 
     def as_js(self):
-        return '(new arrayTypes["{}"]({}["{}"].buffer))[{} >> 2]'.format(
-            self.load_ty, self.module, self.memory, self.ptr.as_js())
+        shift = shift_sizes[self.load_ty]
+        return '(new arrayTypes["{}"]({}["{}"].buffer))[{} >> {}]'.format(
+            self.load_ty, self.module, self.memory, self.ptr.as_js(), shift)
 
 class StoreExpr(BaseExpr):
     def __init__(self, store_ty, module, memory, ptr, expr):
@@ -256,9 +272,9 @@ class StoreExpr(BaseExpr):
         return [self.expr]
 
     def as_js(self):
-        assert self.store_ty == 'u32'
-        return '(new Uint32Array({}["{}"].buffer))[{} >> 2] = {}'.format(
-            self.module, self.memory, self.ptr.as_js(), self.expr.as_js())
+        shift = shift_sizes[self.store_ty]
+        return '(new arrayTypes["{}"]({}["{}"].buffer))[{} >> {}] = {}'.format(
+            self.store_ty, self.module, self.memory, self.ptr.as_js(), shift, self.expr.as_js())
 
 class BufferLenExpr(BaseExpr):
     def __init__(self, expr):
