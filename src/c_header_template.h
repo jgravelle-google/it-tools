@@ -35,14 +35,8 @@ public:
         memcpy(data, vec.data(), size);
     }
 
-    Buffer(Buffer& other) : ITBuffer(other.count * sizeof(T), nullptr), 
-            count(other.count), owned(other.owned) {
-        if (other.owned) {
-            data = new T[count];
-            memcpy(data, other.data, count*sizeof(T));
-        } else {
-            data = other.data;
-        }
+    Buffer(Buffer const& other) : owned(false) {
+        *this = other;
     }
     Buffer(Buffer&& other) = default;
 
@@ -50,6 +44,22 @@ public:
         if (owned) {
             delete[] (T*)data;
         }
+    }
+
+    Buffer& operator=(Buffer const& other) {
+        if (owned) {
+            delete[] (T*)data;
+        }
+        size = other.count * sizeof(T);
+        count = other.count;
+        owned = other.owned;
+        if (owned) {
+            data = new T[count];
+            memcpy(data, other.data, count*sizeof(T));
+        } else {
+            data = other.data;
+        }
+        return *this;
     }
 
     inline T& operator[](int idx) {
