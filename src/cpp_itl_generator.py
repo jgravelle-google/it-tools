@@ -414,6 +414,48 @@ class StructType(Type):
         ret += '};\n'
         return ret
 
+class EnumType(Type):
+    def __init__(self, name, kinds):
+        self.name = name
+        self.kinds = kinds
+
+    def to_it(self):
+        return self.name
+    def to_cpp(self):
+        return self.name
+    def to_wasm(self):
+        return 'i32'
+
+    def lift(self, expr, n_locals):
+        return '(lift-enum {} {})'.format(self.name, expr)
+    def lower(self, expr, n_locals):
+        return '(lower-enum {} {})'.format(self.name, expr)
+
+    def sizeof(self):
+        return 4
+
+    def itl_type_decl(self):
+        ret = tab + '(enum {}\n'.format(self.name)
+        for kind in self.kinds:
+            ret += tab * 2 + kind + '\n'
+        ret += tab + ')\n'
+        return ret
+    def itl_adapter_funcs(self):
+        # no need for helper funcs
+        return ''
+    def cpp_type_decl(self):
+        # base class
+        ret = 'enum class {} {{\n'.format(self.name)
+        for kind in self.kinds:
+            ret += tab + kind + ',\n'
+        ret += '};\n'
+        return ret
+
+    def it_store_expr(self, ptr, val):
+        return '(store u32 wasm "memory" {} {})'.format(ptr, val)
+    def it_load_expr(self, ptr):
+        return '(load u32 wasm "memory" {})'.format(ptr)
+
 class VariantType(Type):
     def __init__(self, name, kinds):
         assert name is not None
@@ -654,6 +696,8 @@ class Parser(object):
         elif kind == 'struct':
             fields = self.parse_struct_body()
             return StructType(name, fields)
+        elif kind == 'enum':
+            return self.parse_enum(name)
         elif kind == 'variant':
             return self.parse_variant(name)
         elif kind == 'array':
@@ -698,6 +742,16 @@ class Parser(object):
             fields[field_name] = ty
         self.expect('}')
         return fields
+
+    def parse_enum(self, name):
+        self.expect('{')
+        kinds = []
+        while self.peek() != '}':
+            kind = self.pop()
+            self.expect(',')
+            kinds.append(kind)
+        self.expect('}')
+        return EnumType(name, kinds)
 
     def parse_variant(self, name):
         self.expect('{')

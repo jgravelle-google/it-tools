@@ -1,11 +1,14 @@
 # AST for ITL
 
+tab = '    '
+
 class Component(object):
     def __init__(self):
         self.imports = {} # imports to the component
         self.exports = [] # exports from the component
         self.modules = [] # modules wrapped by the component
         self.funcs = [] # component-local functions
+        self.types = {} # type declarations
         
         # lookup table for all functions by name
         self.all_funcs = {}
@@ -46,6 +49,22 @@ class Func(object):
         self.body = body
         self.extra_locals = []
         self.location = location
+
+class EnumType(object):
+    def __init__(self, name, kinds):
+        self.name = name
+        self.kinds = kinds
+    def js_decls(self, n_indent):
+        n = n_indent
+        ret = tab * n + 'let _lift_{} = {{\n'.format(self.name)
+        for i, kind in enumerate(self.kinds):
+            ret += tab * (n+1) + '{}: "{}",\n'.format(i, kind)
+        ret += tab * n + '};\n'
+        ret += tab * n + 'let _lower_{} = {{\n'.format(self.name)
+        for i, kind in enumerate(self.kinds):
+            ret += tab * (n+1) + '"{}": {},\n'.format(kind, i)
+        ret += tab * n + '};\n'
+        return ret
 
 class Module(object):
     def __init__(self, name, path):
@@ -463,3 +482,27 @@ class LiftArrayExpr(BaseExpr):
     def as_js(self):
         return 'liftArray("{}", {}, {}, {}, (x{}) => {})'.format(
             self.ty, self.stride, self.ptr.as_js(), self.length.as_js(), self.num_locals, self.body.as_js())
+
+class LiftEnumExpr(BaseExpr):
+    def __init__(self, ty, expr):
+        assert isinstance(ty, EnumType)
+        self.ty = ty
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+
+    def as_js(self):
+        return '_lift_{}[{}]'.format(self.ty.name, self.expr.as_js())
+
+class LowerEnumExpr(BaseExpr):
+    def __init__(self, ty, expr):
+        assert isinstance(ty, EnumType)
+        self.ty = ty
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+
+    def as_js(self):
+        return '_lower_{}[{}]'.format(self.ty.name, self.expr.as_js())

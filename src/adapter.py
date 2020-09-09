@@ -103,6 +103,8 @@ def write_js_module(component):
     js_str = js_str.replace('/**LOAD_MODULES**/', load_modules)
 
     component_functions = ''
+    for ty in component.types.values():
+        component_functions += ty.js_decls(n_indent=2)
     for func in component.funcs:
         component_functions += function(func, n_indent=2, is_internal=True)
     js_str = js_str.replace('/**COMPONENT_FUNCTIONS**/\n', component_functions)

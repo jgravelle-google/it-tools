@@ -194,6 +194,16 @@ def parse(body):
             length = parse_expr(sexpr[4])
             body = parse_expr(sexpr[5])
             return LiftArrayExpr(ty, stride, ptr, length, body, num_locals)
+        elif head == 'lift-enum':
+            assert len(sexpr) == 3
+            ty = component.types[sexpr[1]]
+            expr = parse_expr(sexpr[2])
+            return LiftEnumExpr(ty, expr)
+        elif head == 'lower-enum':
+            assert len(sexpr) == 3
+            ty = component.types[sexpr[1]]
+            expr = parse_expr(sexpr[2])
+            return LowerEnumExpr(ty, expr)
         else:
             try:
                 n = int(sexpr)
@@ -257,7 +267,11 @@ def parse(body):
             component.funcs.append(func)
             component.add_func(func)
         elif group[0] == 'types':
-            pass
+            for elem in group[1:]:
+                if elem[0] == 'enum':
+                    name = elem[1]
+                    kinds = elem[2:]
+                    component.types[name] = EnumType(name, kinds)
 
     # post-initialize now that AST is fully built
     for func in component.all_funcs_iter():
