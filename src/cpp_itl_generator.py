@@ -256,7 +256,10 @@ class Func(object):
 
 class Type(object):
     # base class for type system
-    pass
+    def to_cpp_array(self):
+        # cpp type when used in arrays; special cased for StructTypes which are
+        # Foo* when passed alone, and Array<Foo> in arrays
+        return self.to_cpp()
 
 class SimpleType(Type):
     mapping = {
@@ -350,6 +353,8 @@ class StructType(Type):
         return self.name
     def to_cpp(self):
         return self.name + '*'
+    def to_cpp_array(self):
+        return self.name
     def to_wasm(self):
         return 'i32'
 
@@ -371,6 +376,7 @@ class StructType(Type):
         ret += tab + ')\n'
         return ret
     def itl_adapter_funcs(self):
+        # lifting function: reads fields and stores on a new record object
         ret = '(func _it_lift_{} "" (param i32) (result any)\n'.format(self.name)
         ret += tab + '(make-record {}\n'.format(self.name)
         offset = 0
@@ -382,16 +388,23 @@ class StructType(Type):
         ret += tab + ')\n'
         ret += ')\n'
 
-        ret += '(func _it_lower_{} "" (param any) (result i32)\n'.format(self.name)
-        ret += tab + '(let (call _it_malloc {}))\n'.format(self.sizeof())
+        # writeTo: helper function to write fields to a specific pointer in memory
+        # used in lowering, but also for writing into arrays
+        ret += '(func _it_writeTo_{} "" (param i32 any) (result i32)\n'.format(self.name)
         offset = 0
         for name, ty in self.fields.items():
-            read = '(read-field {} {} (local 0))'.format(self.name, name)
-            ptr = '(+ {} (local 1))'.format(offset)
+            read = '(read-field {} {} (local 1))'.format(self.name, name)
+            ptr = '(+ {} (local 0))'.format(offset)
             val = ty.lower(read, n_locals=2)
             ret += tab + ty.it_store_expr(ptr, val) + '\n'
             offset += ty.sizeof()
-        ret += tab + '(local 1)\n'
+        ret += tab + '(local 0)\n'
+        ret += ')\n'
+
+        # lowering function: mallocs memory and writes into it
+        ret += '(func _it_lower_{} "" (param any) (result i32)\n'.format(self.name)
+        ret += tab + '(call _it_writeTo_{} (call _it_malloc {}) (local 0))\n'.format(
+            self.name, self.sizeof())
         ret += ')\n'
         return ret
     def cpp_type_decl(self):
@@ -555,23 +568,38 @@ class ArrayType(Type):
     def to_it(self):
         return '(array {})'.format(self.ty.to_it())
     def to_cpp(self):
-        return 'ITBuffer*'
+        return 'Buffer<{}>*'.format(self.ty.to_cpp_array())
     def to_wasm(self):
         return 'i32'
 
     def lift(self, expr, n_locals):
         size = self.ty.sizeof()
-        if isinstance(self.ty, SimpleType):
-            body = '(load {} wasm "memory" (local {}))'.format(
-                self.ty.to_it(), n_locals)
-        else:
+        ptr = '(local {})'.format(n_locals)
+        if isinstance(self.ty, StructType):
             # structs are passed inline with the array memory, so no need to load
-            body = '(local {})'.format(n_locals)
+            body = ptr
+        else:
+            body = self.ty.it_load_expr(ptr)
         # args are: type, stride, ptr, count, body
         return ('(lift-array {} {} '.format(self.ty.to_it(), size) +
             '(load u32 wasm "memory" (+ {} 4)) '.format(expr) +
             '(/ (load u32 wasm "memory" {}) {}) '.format(expr, size) +
             self.ty.lift(body, n_locals+1) +
+        ')')
+    def lower(self, expr, n_locals):
+        size = self.ty.sizeof()
+        ptr = '(local {})'.format(n_locals)
+        val = '(local {})'.format(n_locals+1)
+        if isinstance(self.ty, StructType):
+            body = '(call _it_writeTo_{} {} {})'.format(self.ty.name, ptr, val)
+        else:
+            # structs are passed inline with the array memory, so no need to load
+            body = self.ty.lower(self.ty.it_store_expr(ptr, val), n_locals+2)
+        # args are: type, stride, ptr, array, body
+        return ('(lower-array {} {} '.format(self.ty.to_it(), size) +
+            '(call _it_malloc (* {} (array-len {}))) '.format(size, expr) +
+            expr + ' ' +
+            body +
         ')')
 
 def parse_it(contents):

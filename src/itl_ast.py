@@ -483,6 +483,35 @@ class LiftArrayExpr(BaseExpr):
         return 'liftArray("{}", {}, {}, {}, (x{}) => {})'.format(
             self.ty, self.stride, self.ptr.as_js(), self.length.as_js(), self.num_locals, self.body.as_js())
 
+class LowerArrayExpr(BaseExpr):
+    def __init__(self, ty, stride, ptr, array, body, num_locals):
+        self.ty = ty
+        self.stride = stride
+        self.ptr = ptr
+        self.array = array
+        self.body = body
+        self.num_locals = num_locals
+
+    def children(self):
+        return [self.ptr, self.array, self.body]
+
+    def as_js(self):
+        return 'lowerArray("{}", {}, {}, {}, (x{}, x{}) => {})'.format(
+            self.ty, self.stride, self.ptr.as_js(), self.array.as_js(),
+            self.num_locals, self.num_locals+1, self.body.as_js())
+
+class ArrayLenExpr(BaseExpr):
+    def __init__(self, expr):
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+    def ty(self):
+        return 's32'
+
+    def as_js(self):
+        return '{}.length'.format(self.expr.as_js())
+
 class LiftEnumExpr(BaseExpr):
     def __init__(self, ty, expr):
         assert isinstance(ty, EnumType)

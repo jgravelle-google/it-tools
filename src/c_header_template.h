@@ -71,6 +71,9 @@ public:
     inline T const& operator[](int idx) const {
         return ((T*)data)[idx];
     }
+    inline T& ref(int idx) {
+        return ((T*)data)[idx];
+    }
 
     int size() const {
         return nElems;

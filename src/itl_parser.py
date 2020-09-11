@@ -135,6 +135,11 @@ def parse(body):
             lhs = parse_expr(sexpr[1])
             rhs = parse_expr(sexpr[2])
             return BinaryExpr(lhs, rhs, '+', 'i32.add')
+        elif head == '*':
+            assert(len(sexpr) == 3)
+            lhs = parse_expr(sexpr[1])
+            rhs = parse_expr(sexpr[2])
+            return BinaryExpr(lhs, rhs, '*', 'i32.mul')
         elif head == '/':
             assert(len(sexpr) == 3)
             lhs = parse_expr(sexpr[1])
@@ -187,13 +192,25 @@ def parse(body):
             expr = parse_expr(sexpr[3])
             return ReadFieldExpr(record, field, expr)
         elif head == 'lift-array':
-            assert(len(sexpr) == 6)
+            assert len(sexpr) == 6
             ty = sexpr[1]
             stride = sexpr[2]
             ptr = parse_expr(sexpr[3])
             length = parse_expr(sexpr[4])
             body = parse_expr(sexpr[5])
             return LiftArrayExpr(ty, stride, ptr, length, body, num_locals)
+        elif head == 'lower-array':
+            assert len(sexpr) == 6
+            ty = sexpr[1]
+            stride = sexpr[2]
+            ptr = parse_expr(sexpr[3])
+            array = parse_expr(sexpr[4])
+            body = parse_expr(sexpr[5])
+            return LowerArrayExpr(ty, stride, ptr, array, body, num_locals)
+        elif head == 'array-len':
+            assert len(sexpr) == 2
+            expr = parse_expr(sexpr[1])
+            return ArrayLenExpr(expr)
         elif head == 'lift-enum':
             assert len(sexpr) == 3
             ty = component.types[sexpr[1]]

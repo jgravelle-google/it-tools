@@ -55,6 +55,12 @@ const /**COMPONENT_NAME**/ = {
             }
             return ret;
         }
+        function lowerArray(ty, stride, ptr, arr, body) {
+            for (let i = 0; i < arr.length; ++i) {
+                body(ptr + i*stride, arr[i]);
+            }
+            return ptr;
+        }
 
         // References
         // first elem is null so we avoid assigning 0 as a valid index
