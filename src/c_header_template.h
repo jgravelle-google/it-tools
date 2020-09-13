@@ -28,12 +28,11 @@ public:
 // ITBuffer - probably passed in from an import.
 template <typename T>
 class Buffer : public ITBuffer {
-    int nElems; // number of elements
     bool owned; // whether Buffer is responsible for freeing the memory
 public:
-    Buffer(int n) : ITBuffer(n * sizeof(T), new T[n]), nElems(n), owned(true) {}
-    Buffer() : ITBuffer(0, nullptr), nElems(0), owned(false) {}
-    Buffer(int n, void* _data) : ITBuffer(n * sizeof(T), _data), nElems(n), owned(false) {}
+    Buffer(int n) : ITBuffer(n * sizeof(T), new T[n]), owned(true) {}
+    Buffer() : ITBuffer(0, nullptr), owned(false) {}
+    Buffer(int n, void* _data) : ITBuffer(n * sizeof(T), _data), owned(false) {}
     Buffer(std::vector<T> const& vec) : Buffer(vec.size()) {
         memcpy(data, vec.data(), nBytes);
     }
@@ -54,11 +53,10 @@ public:
             delete[] (T*)data;
         }
         nBytes = other.nBytes;
-        nElems = other.nElems;
         owned = other.owned;
         if (owned) {
-            data = new T[nElems];
-            memcpy(data, other.data, nElems*sizeof(T));
+            data = new T[size()];
+            memcpy(data, other.data, nBytes);
         } else {
             data = other.data;
         }
@@ -76,7 +74,7 @@ public:
     }
 
     int size() const {
-        return nElems;
+        return nBytes / sizeof(T);
     }
 };
 

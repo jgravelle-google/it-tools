@@ -587,20 +587,30 @@ class ArrayType(Type):
             self.ty.lift(body, n_locals+1) +
         ')')
     def lower(self, expr, n_locals):
+        # this is complicated
+        # need to do all this in a single expression, meaning we make a lambda
+        arr_ptr = '(local {})'.format(n_locals)
+        expr_local = '(local {})'.format(n_locals+1)
+        # lower-array will also introduce two new locals
+        ptr = '(local {})'.format(n_locals+2)
+        val = '(local {})'.format(n_locals+3)
         size = self.ty.sizeof()
-        ptr = '(local {})'.format(n_locals)
-        val = '(local {})'.format(n_locals+1)
         if isinstance(self.ty, StructType):
             body = '(call _it_writeTo_{} {} {})'.format(self.ty.name, ptr, val)
         else:
             # structs are passed inline with the array memory, so no need to load
-            body = self.ty.lower(self.ty.it_store_expr(ptr, val), n_locals+2)
-        # args are: type, stride, ptr, array, body
-        return ('(lower-array {} {} '.format(self.ty.to_it(), size) +
-            '(call _it_malloc (* {} (array-len {}))) '.format(size, expr) +
-            expr + ' ' +
+            body = self.ty.lower(self.ty.it_store_expr(ptr, val), n_locals+4)
+        # args to lower-array are: type, stride, ptr, array, body
+        array = ('(lower-array {} {} '.format(self.ty.to_it(), size) +
+            '(call _it_malloc (* {} (array-len {}))) '.format(size, expr_local) +
+            expr_local + ' ' +
             body +
         ')')
+        lam_body = ('(store u32 wasm "memory" {} (* {} (array-len {}))) '.format(arr_ptr, size, expr_local) +
+            '(store u32 wasm "memory" (+ 4 {}) {}) '.format(arr_ptr, array) +
+            arr_ptr)
+        lam_ty = FuncType([SimpleType('s32'), SimpleType('any')], self)
+        return '(call-expr (lambda {} {}) (call _it_malloc 8) {})'.format(lam_ty.to_it(), lam_body, expr)
 
 def parse_it(contents):
     tokens = Lexer(contents).lex()

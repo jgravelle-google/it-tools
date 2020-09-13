@@ -419,11 +419,14 @@ class LambdaExpr(BaseExpr):
         self.num_locals = num_locals
 
     def children(self):
-        return [self.body]
+        return self.body
 
     def as_js(self):
         args = ', '.join('x' + str(i + self.num_locals) for i in range(len(self.fn_ty.params)))
-        return '(({}) => {})'.format(args, self.body.as_js())
+        body = ''.join(ex.as_js() + '; ' for ex in self.body[:-1])
+        if self.body:
+            body += 'return ' + self.body[-1].as_js()
+        return '(({}) => {{ {} }})'.format(args, body)
 
 # naming; ugh
 class CallExprExpr(BaseExpr):
