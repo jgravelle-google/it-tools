@@ -261,6 +261,13 @@ class Type(object):
         # Foo* when passed alone, and Array<Foo> in arrays
         return self.to_cpp()
 
+    def cpp_type_decl(self):
+        return ''
+    def itl_type_decl(self):
+        return ''
+    def itl_adapter_funcs(self):
+        return ''
+
 class SimpleType(Type):
     mapping = {
         'u1': 'bool',
@@ -329,7 +336,6 @@ class SimpleType(Type):
         elif self.ty in ['u16', 's16']:
             return 2
         return 4
-
     def it_store_expr(self, ptr, val):
         if self.ty in ['buffer', 'string']:
             ty = 'u32'
@@ -345,9 +351,9 @@ class SimpleType(Type):
 
 class StructType(Type):
     def __init__(self, name, fields):
-        self.fields = fields
         assert name is not None
         self.name = name
+        self.fields = fields
 
     def to_it(self):
         return self.name
@@ -383,7 +389,7 @@ class StructType(Type):
         for name, ty in self.fields.items():
             ptr = '(+ {} (local 0))'.format(offset)
             load = ty.it_load_expr(ptr)
-            ret += tab*2 + '(field {} {})\n'.format(name, ty.lift(load, n_locals=2))
+            ret += tab*2 + '(field {} {})\n'.format(name, ty.lift(load, n_locals=1))
             offset += ty.sizeof()
         ret += tab + ')\n'
         ret += ')\n'
@@ -470,10 +476,10 @@ class EnumType(Type):
         return '(load u32 wasm "memory" {})'.format(ptr)
 
 class VariantType(Type):
-    def __init__(self, name, kinds):
+    def __init__(self, name):
         assert name is not None
         self.name = name
-        self.kinds = kinds
+        self.kinds = None
 
     def to_it(self):
         return self.name
@@ -492,11 +498,40 @@ class VariantType(Type):
         return 4
 
     def itl_type_decl(self):
-        # TODO
-        return ''
+        ret = ''
+        for name, kind in self.kinds.items():
+            ret += StructType(self.name + '$' + name, kind.fields).itl_type_decl()
+        ret += tab + '(variant {}\n'.format(self.name)
+        for name in self.kinds.keys():
+            ret += tab * 2 + '({0} {1}${0})\n'.format(name, self.name)
+        ret += tab + ')\n'
+        return ret
     def itl_adapter_funcs(self):
-        # TODO
-        return ''
+        ret = ''
+        for i, (name, kind) in enumerate(self.kinds.items()):
+            fullname = self.name + '$' + name
+            # reuse StructType codegen for convenience
+            ret += StructType(fullname, kind.fields).itl_adapter_funcs()
+            # variant-specific struct lower; need to malloc an extra 4 bytes for the kind field
+            ret += '(func _it_lowervar_{} "" (param any) (result i32)\n'.format(fullname)
+            ret += tab + '(let (call _it_malloc {}))\n'.format(kind.sizeof() + 4)
+            ret += tab + '(store u32 wasm "memory" (local 1) {})\n'.format(i)
+            ret += tab + '(call _it_writeTo_{} (+ 4 (local 1)))\n'.format(fullname)
+            ret += ')\n'
+
+        ret += '(func _it_lift_{} "" (param i32) (result any)\n'.format(self.name)
+        ret += tab + '(switch (load u32 wasm "memory" (local 0))\n'
+        for i, name in enumerate(self.kinds.keys()):
+            ret += tab*2 + '(case {0} (lift-variant {1} {2} (call _it_lift_{1}${2} (+ 4 (local 0)))))\n'.format(
+                i, self.name, name)
+        ret += tab + ')\n'
+        ret += ')\n'
+
+        ret += '(func _it_lower_{} "" (param any) (result i32)\n'.format(self.name)
+        funcs = ' '.join('_it_lower_{}${}'.format(self.name, name) for name in self.kinds.keys())
+        ret += tab + '(lower-variant {} {} (local 0))\n'.format(self.name, funcs)
+        ret += ')\n'
+        return ret
     def cpp_type_decl(self):
         # base class
         ret = 'class {} {{\n'.format(self.name)
@@ -530,6 +565,14 @@ class VariantType(Type):
             ret += tab + '{}({}) : {}, {} {{}}\n'.format(struct.name, args, base, inits)
             ret += '};\n'
         return ret
+
+    def sizeof(self):
+        # just pointer
+        return 4
+    def it_load_expr(self, ptr):
+        return '(load u32 wasm "memory" {})'.format(ptr)
+    def it_store_expr(self, ptr, val):
+        return '(store u32 wasm "memory" {} {})'.format(ptr, val)
 
 class FuncType(Type):
     def __init__(self, args, ret):
@@ -611,6 +654,14 @@ class ArrayType(Type):
             arr_ptr)
         lam_ty = FuncType([SimpleType('s32'), SimpleType('any')], self)
         return '(call-expr (lambda {} {}) (call _it_malloc 8) {})'.format(lam_ty.to_it(), lam_body, expr)
+
+    def sizeof(self):
+        # just pointer
+        return 4
+    def it_load_expr(self, ptr):
+        return '(load u32 wasm "memory" {})'.format(ptr)
+    def it_store_expr(self, ptr, val):
+        return '(store u32 wasm "memory" {} {})'.format(ptr, val)
 
 def parse_it(contents):
     tokens = Lexer(contents).lex()
@@ -737,7 +788,10 @@ class Parser(object):
         elif kind == 'enum':
             return self.parse_enum(name)
         elif kind == 'variant':
-            return self.parse_variant(name)
+            ty = VariantType(name)
+            self.types[name] = ty
+            self.parse_variant(ty)
+            return ty
         elif kind == 'array':
             self.expect('(')
             ty = self.parse_type()
@@ -791,7 +845,9 @@ class Parser(object):
         self.expect('}')
         return EnumType(name, kinds)
 
-    def parse_variant(self, name):
+    def parse_variant(self, ty):
+        # parse kinds, assign to ty
+        assert isinstance(ty, VariantType)
         self.expect('{')
         kinds = {}
         while self.peek() != '}':
@@ -799,7 +855,7 @@ class Parser(object):
             fields = self.parse_struct_body()
             kinds[kind_name] = StructType(kind_name, fields)
         self.expect('}')
-        return VariantType(name, kinds)
+        ty.kinds = kinds
 
     # Helper funcs
     def peek(self):

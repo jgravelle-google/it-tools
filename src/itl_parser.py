@@ -220,6 +220,28 @@ def parse(body):
             ty = component.types[sexpr[1]]
             expr = parse_expr(sexpr[2], num_locals)
             return LowerEnumExpr(ty, expr)
+        elif head == 'lift-variant':
+            assert len(sexpr) == 4
+            ty = component.types[sexpr[1]]
+            kind = sexpr[2]
+            expr = parse_expr(sexpr[3], num_locals)
+            return LiftVariantExpr(ty, kind, expr)
+        elif head == 'lower-variant':
+            assert len(sexpr) >= 4
+            ty = component.types[sexpr[1]]
+            cases = sexpr[2:-1]
+            expr = parse_expr(sexpr[-1], num_locals)
+            return LowerVariantExpr(ty, cases, expr)
+        elif head == 'switch':
+            expr = parse_expr(sexpr[1], num_locals)
+            cases = []
+            for s in sexpr[2:]:
+                assert s[0] == 'case'
+                assert len(s) == 3
+                cond = parse_expr(s[1], num_locals)
+                val = parse_expr(s[2], num_locals)
+                cases.append((cond, val))
+            return SwitchExpr(expr, cases)
         else:
             try:
                 n = int(sexpr)
@@ -288,6 +310,12 @@ def parse(body):
                     name = elem[1]
                     kinds = elem[2:]
                     component.types[name] = EnumType(name, kinds)
+                elif elem[0] == 'variant':
+                    name = elem[1]
+                    kinds = {}
+                    for x in elem[2:]:
+                        kinds[x[0]] = x[1]
+                    component.types[name] = VariantType(name, kinds)
 
     # post-initialize now that AST is fully built
     for func in component.all_funcs_iter():

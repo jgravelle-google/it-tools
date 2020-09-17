@@ -66,6 +66,13 @@ class EnumType(object):
         ret += tab * n + '};\n'
         return ret
 
+class VariantType(object):
+    def __init__(self, name, kinds):
+        self.name = name
+        self.kinds = kinds
+    def js_decls(self, n_indent):
+        return EnumType(self.name, self.kinds.keys()).js_decls(n_indent)
+
 class Module(object):
     def __init__(self, name, path):
         self.name = name
@@ -538,3 +545,51 @@ class LowerEnumExpr(BaseExpr):
 
     def as_js(self):
         return '_lower_{}[{}]'.format(self.ty.name, self.expr.as_js())
+
+class LiftVariantExpr(BaseExpr):
+    def __init__(self, ty, kind, expr):
+        assert isinstance(ty, VariantType)
+        self.ty = ty
+        self.kind = kind
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+
+    def as_js(self):
+        return '((x) => {{ x.$kind = "{}"; return x; }})({})'.format(
+            self.kind, self.expr.as_js())
+
+class LowerVariantExpr(BaseExpr):
+    def __init__(self, ty, cases, expr):
+        assert isinstance(ty, VariantType)
+        assert len(cases) == len(ty.kinds)
+        self.ty = ty
+        self.cases = cases
+        self.expr = expr
+
+    def children(self):
+        return [self.expr]
+
+    def as_js(self):
+        body = ''
+        for i, fn in enumerate(self.cases):
+            body += 'if (x.$kind == _lift_{}[{}]) {{ return {}(x); }}; '.format(self.ty.name, i, fn)
+        return '((x) => {{ {} throw "UNHANDLED VARIANT CASE"; }})({})'.format(body, self.expr.as_js())
+
+class SwitchExpr(BaseExpr):
+    def __init__(self, expr, cases):
+        self.expr = expr
+        self.cases = cases
+
+    def children(self):
+        ret = [self.expr]
+        for cond, val in self.cases:
+            ret += [cond, val]
+        return ret
+
+    def as_js(self):
+        body = ''
+        for cond, val in self.cases:
+            body += 'if (c == {}) {{ return {}; }}; '.format(cond.as_js(), val.as_js())
+        return '((c) => {{ {} throw "UNHANDLED SWITCH CASE"; }})({})'.format(body, self.expr.as_js())
