@@ -534,15 +534,20 @@ class VariantType(Type):
         return ret
     def cpp_type_decl(self):
         # base class
-        ret = 'class {} {{\n'.format(self.name)
+        ret = ''
+        for name in self.kinds.keys():
+            ret += 'struct {};\n'.format(name)
+        ret += 'class {} {{\n'.format(self.name)
         ret += 'protected:\n'
-        ret += tab + 'enum _Kind {\n'
+        ret += tab + 'enum class _Kind {\n'
         for struct in self.kinds.values():
             ret += tab * 2 + struct.name + ',\n'
         ret += tab + '};\n'
         ret += tab + 'volatile _Kind kind;\n'
         ret += 'public:\n'
         ret += tab + self.name + '(_Kind _kind) : kind(_kind) {}\n'
+        for name in self.kinds.keys():
+            ret += tab + 'virtual {0}* as_{0}() {{ return nullptr; }}\n'.format(name)
         ret += '};\n'
 
         # sublcasses
@@ -561,8 +566,9 @@ class VariantType(Type):
                 args += '{} _{}'.format(ty.to_cpp(), name)
                 inits += '{0}(_{0})'.format(name)
             # base class constructor with _Kind enum set
-            base = '{0}({0}::{1})'.format(self.name, struct.name)
+            base = '{0}({0}::_Kind::{1})'.format(self.name, struct.name)
             ret += tab + '{}({}) : {}, {} {{}}\n'.format(struct.name, args, base, inits)
+            ret += tab + 'virtual {0}* as_{0}() {{ return this; }}\n'.format(struct.name)
             ret += '};\n'
         return ret
 
