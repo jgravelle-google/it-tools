@@ -528,7 +528,7 @@ class VariantType(Type):
         ret += ')\n'
 
         ret += '(func _it_lower_{} "" (param any) (result i32)\n'.format(self.name)
-        funcs = ' '.join('_it_lower_{}${}'.format(self.name, name) for name in self.kinds.keys())
+        funcs = ' '.join('_it_lowervar_{}${}'.format(self.name, name) for name in self.kinds.keys())
         ret += tab + '(lower-variant {} {} (local 0))\n'.format(self.name, funcs)
         ret += ')\n'
         return ret
@@ -541,13 +541,13 @@ class VariantType(Type):
         ret += 'protected:\n'
         ret += tab + 'enum class _Kind {\n'
         for struct in self.kinds.values():
-            ret += tab * 2 + struct.name + ',\n'
+            ret += tab * 2 + '{},\n'.format(struct.name)
         ret += tab + '};\n'
         ret += tab + 'volatile _Kind kind;\n'
         ret += 'public:\n'
         ret += tab + self.name + '(_Kind _kind) : kind(_kind) {}\n'
         for name in self.kinds.keys():
-            ret += tab + 'virtual {0}* as_{0}() {{ return nullptr; }}\n'.format(name)
+            ret += tab + '{0}* as_{0}() {{ return (kind == _Kind::{0}) ? ({0}*)this : nullptr; }}\n'.format(name)
         ret += '};\n'
 
         # sublcasses
@@ -568,7 +568,6 @@ class VariantType(Type):
             # base class constructor with _Kind enum set
             base = '{0}({0}::_Kind::{1})'.format(self.name, struct.name)
             ret += tab + '{}({}) : {}, {} {{}}\n'.format(struct.name, args, base, inits)
-            ret += tab + 'virtual {0}* as_{0}() {{ return this; }}\n'.format(struct.name)
             ret += '};\n'
         return ret
 
