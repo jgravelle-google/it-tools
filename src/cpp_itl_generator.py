@@ -516,7 +516,8 @@ class VariantType(Type):
             ret += '(func _it_lowervar_{} "" (param any) (result i32)\n'.format(fullname)
             ret += tab + '(let (call _it_malloc {}))\n'.format(kind.sizeof() + 4)
             ret += tab + '(store u32 wasm "memory" (local 1) {})\n'.format(i)
-            ret += tab + '(call _it_writeTo_{} (+ 4 (local 1)))\n'.format(fullname)
+            ret += tab + '(call _it_writeTo_{} (+ 4 (local 1)) (local 0))\n'.format(fullname)
+            ret += tab + '(local 1)\n'
             ret += ')\n'
 
         ret += '(func _it_lift_{} "" (param i32) (result any)\n'.format(self.name)
